@@ -17,7 +17,7 @@
 | --- | --- |
 | `docs/state/` | 当前事实源：状态、队列、风险、输入。 |
 | `docs/tasks/` | 可独立验收任务的规格。 |
-| `docs/adr/` | 架构决策记录。 |
+| `docs/adr/` | 架构决策记录；当前包含 P0 核心数据模型决策 `0001-p0-core-data-model.md`。 |
 | `docs/openapi/` | 未来对外 HTTP/API 契约；P0 暂无。 |
 | `docs/DEVELOPMENT_PROCESS.md` | 仓库统一开发流程。 |
 

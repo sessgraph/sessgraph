@@ -12,7 +12,7 @@
 | PR-0001 | 已完成 | 建立规划与 AI 治理文件 | `docs/tasks/T-0001-bootstrap-governance.md` | 仅 docs/state；不实现 runtime | Markdown/文件一致性检查；git diff review |
 | PR-0001F | 已完成 | 处理规划 review 意见并新增中文统一流程 | `docs/tasks/T-0003-review-planning-files.md` | 仅 docs/process/index/ADR/OpenAPI 占位；不实现 runtime | Markdown/文件一致性检查；git diff review |
 | PR-0001G | 已完成 | 将 agent 指令和规划文档统一为中文 | `docs/tasks/T-0004-localize-agent-docs.md` | root agent 指令、README、docs/state、docs/tasks 的中文化；不实现 runtime | Markdown/文件一致性检查；git diff review |
-| PR-0002 | 拟议 | 定义 P0 核心数据结构 | `docs/tasks/T-0002-p0-data-model.md` | AgentDefinition、Session、Signal、Event、Decision、Checkpoint 数据类型和测试 | 构造、校验、序列化单元测试 |
+| PR-0002 | 已完成 | 定义 P0 核心数据结构 | `docs/tasks/T-0002-p0-data-model.md` | AgentDefinition、Session、Signal、Event、Decision、Checkpoint 数据类型和测试 | 构造、校验、序列化单元测试 |
 | PR-0003 | 拟议 | 实现 InMemory stores | TBD | SessionStore、InboxStore、EventStore、CheckpointStore | 包含幂等性的确定性 store 测试 |
 | PR-0004 | 拟议 | 构建最小 Activation Runner 循环 | TBD | FakeModel + final_answer Decision + basic example | 单元测试和 example smoke test |
 | PR-0005 | 拟议 | 增加同步 tool execution flow | TBD | ToolSpec、ToolRegistry、SyncToolExecutor | Tool 成功/失败测试 |
@@ -28,6 +28,13 @@
 - `docs/README.md` 索引文档表面。
 - `docs/adr/0000-template.md` 和 `docs/openapi/README.md` 保留架构决策与契约事实源位置。
 - 规划/bootstrap 变更均以文档提交完成。
+
+## PR-0002 完成记录
+
+- 新增 P0 core data structures：`AgentDefinition`、`Session`、`Signal`、`Event`、`Decision`、`Checkpoint`。
+- 新增 ADR-0001，记录 Python 3.12、dataclasses、JSON-compatible `schema_version: 1`、Signal/Event 幂等字段和 Checkpoint 恢复边界。
+- 新增标准库 `unittest` 覆盖构造校验、序列化 round-trip 和严格 JSON payload。
+- 未实现 Activation Runner、InMemory stores、tool execution、wait/resume、provider integration、database 或 server mode。
 
 ## 队列纪律
 
