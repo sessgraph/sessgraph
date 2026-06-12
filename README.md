@@ -1,16 +1,41 @@
-## Hi there 👋
+# SessGraph
 
-<!--
-**sessgraph/sessgraph** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+面向长期运行 AI agent 的 durable Session runtime。
 
-Here are some ideas to get you started:
+SessGraph 是一个计划中的开源运行时内核，用于构建 durable（持久化）、stateful（有状态）、event-driven（事件驱动）、recoverable（可恢复）、parallel（可并行）的长期运行 AI agent。项目的核心观点是：Agent 不是一个长期运行的进程，而是一个可被 Signal 激活、可记录 Event、可保存 Checkpoint、可中断恢复的 durable Session 状态机。
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+## 当前阶段
+
+仓库处于规划/bootstrap 阶段。当前目标不是快速堆实现，而是先把项目边界、P0 范围、AI 协作流程和后续 PR 队列固化到仓库文件中。
+
+权威入口：
+
+- [`docs/state/project-status.md`](docs/state/project-status.md)：当前状态和下一步。
+- [`docs/state/project-state.md`](docs/state/project-state.md)：项目目标、边界、核心原则。
+- [`docs/DEVELOPMENT_PROCESS.md`](docs/DEVELOPMENT_PROCESS.md)：统一开发流程。
+- [`docs/state/pr-queue.md`](docs/state/pr-queue.md)：产品 PR 队列。
+- [`docs/tasks/`](docs/tasks/)：可独立验收任务规格。
+- [`AGENTS.md`](AGENTS.md) / [`CLAUDE.md`](CLAUDE.md)：AI agent 工作约束。
+
+## P0 方向
+
+P0 只做本地、确定性、可测试的 runtime core：
+
+- AgentDefinition、Session、Signal、Event、Decision、Checkpoint 数据模型。
+- Session Inbox 和 Activation Runner。
+- InMemory stores 和 FakeModel adapter。
+- durable Session 闭环稳定后，再加入同步 Tool execution。
+- 确定性测试和最小可运行 example。
+
+P0 明确不做：真实 LLM provider、数据库、Web server、云部署、GUI、复杂多 Agent 编排、业务逻辑。
+
+## 开发方式
+
+所有工作通过 `docs/state/`、`docs/tasks/`、ADR、提交和 PR 协调。一个改动没有完成状态回写和提交，就不算完成。
+
+新会话开工前请先读：
+
+1. `docs/state/project-status.md`
+2. `docs/state/pr-queue.md`
+3. `docs/DEVELOPMENT_PROCESS.md`
+4. `AGENTS.md` 或对应工具指令文件
