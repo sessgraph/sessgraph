@@ -21,6 +21,15 @@ from sessgraph.runtime import (
     DecisionRejectedError,
     ModelAdapter,
 )
+from sessgraph.tools import (
+    DuplicateToolError,
+    SyncToolExecutor,
+    ToolError,
+    ToolNotFoundError,
+    ToolRegistry,
+    ToolResult,
+    ToolSpec,
+)
 from sessgraph.stores import (
     ConcurrencyError,
     DuplicateRecordError,
@@ -44,6 +53,7 @@ __all__ = [
     "DecisionKind",
     "DecisionRejectedError",
     "DuplicateRecordError",
+    "DuplicateToolError",
     "Event",
     "FakeModel",
     "IdempotencyConflictError",
@@ -58,6 +68,12 @@ __all__ = [
     "Session",
     "SessionStatus",
     "Signal",
+    "SyncToolExecutor",
     "StoreError",
+    "ToolError",
+    "ToolNotFoundError",
+    "ToolRegistry",
+    "ToolResult",
+    "ToolSpec",
     "ValidationError",
 ]

@@ -15,7 +15,7 @@
 | PR-0002 | 已完成 | 定义 P0 核心数据结构 | `docs/tasks/T-0002-p0-data-model.md` | AgentDefinition、Session、Signal、Event、Decision、Checkpoint 数据类型和测试 | 构造、校验、序列化单元测试 |
 | PR-0003 | 已完成 | 实现 InMemory stores | `docs/tasks/T-0005-p0-inmemory-stores.md` | SessionStore、InboxStore、EventStore、CheckpointStore | 包含幂等性的确定性 store 测试 |
 | PR-0004 | 已完成 | 构建最小 Activation Runner 循环 | `docs/tasks/T-0006-p0-activation-runner.md` | FakeModel + final_answer Decision + basic example | 单元测试和 example smoke test |
-| PR-0005 | 拟议 | 增加同步 tool execution flow | TBD | ToolSpec、ToolRegistry、SyncToolExecutor | Tool 成功/失败测试 |
+| PR-0005 | 已完成 | 增加同步 tool execution flow | `docs/tasks/T-0007-sync-tool-execution.md` | ToolSpec、ToolRegistry、SyncToolExecutor | Tool 成功/失败测试 |
 | PR-0006 | 拟议 | 增加 wait/resume user flow | TBD | ask_user Decision 和 user_message Signal resume | waiting/resume 测试 |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
@@ -50,6 +50,14 @@
 - 新增 ADR-0002，记录 P0 Activation Runner 最小循环语义。
 - 新增 `examples/basic_session.py` 和 example smoke test。
 - 未实现 tool execution、wait/resume、async job/timer、provider integration、database 或 server mode。
+
+## PR-0005 完成记录
+
+- 新增 `DecisionKind.TOOL_CALL`、`ToolSpec`、`ToolRegistry`、`SyncToolExecutor` 和 `ToolResult`。
+- Runner 支持同步分发 `tool_call` Decision，记录 `tool_call_requested` / `tool_result_produced` Event，并将 ToolResult 回灌为 `tool_result` Signal。
+- 新增 ADR-0003，记录同步 tool execution 语义。
+- 新增标准库 `unittest` 覆盖工具注册、成功执行、失败结果、未知工具和 runner tool flow。
+- 未实现 wait/resume、async job/timer、approval/authorization、provider integration、database 或 server mode。
 
 ## 队列纪律
 

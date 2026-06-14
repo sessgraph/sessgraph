@@ -120,6 +120,36 @@ class CoreModelTests(unittest.TestCase):
                 created_at=NOW,
             )
 
+    def test_decision_round_trips_and_validates_tool_call(self) -> None:
+        decision = Decision(
+            decision_id="dec-tool-1",
+            session_id="sess-1",
+            kind="tool_call",
+            payload={"tool_name": "echo", "arguments": {"text": "hello"}},
+            created_at=NOW,
+        )
+
+        restored = Decision.from_dict(decision.to_dict())
+
+        self.assertEqual(restored, decision)
+        self.assertEqual(restored.kind, DecisionKind.TOOL_CALL)
+
+        invalid_payloads = (
+            {},
+            {"tool_name": "", "arguments": {}},
+            {"tool_name": "echo"},
+            {"tool_name": "echo", "arguments": []},
+        )
+        for payload in invalid_payloads:
+            with self.assertRaises(ValidationError):
+                Decision(
+                    decision_id="dec-tool-invalid",
+                    session_id="sess-1",
+                    kind=DecisionKind.TOOL_CALL,
+                    payload=payload,
+                    created_at=NOW,
+                )
+
     def test_checkpoint_round_trips(self) -> None:
         checkpoint = Checkpoint(
             checkpoint_id="chk-1",

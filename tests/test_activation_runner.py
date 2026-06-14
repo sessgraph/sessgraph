@@ -21,6 +21,9 @@ from sessgraph import (
     Session,
     SessionStatus,
     Signal,
+    SyncToolExecutor,
+    ToolRegistry,
+    ToolSpec,
 )
 
 
@@ -96,6 +99,54 @@ class ActivationRunnerTests(unittest.TestCase):
         self.assertEqual(fixture.event_store.list_for_session("sess-1"), ())
         self.assertIsNone(fixture.checkpoint_store.latest_for_session("sess-1"))
 
+    def test_run_once_tool_call_executes_tool_and_enqueues_result_signal(self) -> None:
+        registry = ToolRegistry()
+        registry.register(
+            ToolSpec(
+                name="uppercase",
+                description="Uppercase text.",
+                handler=lambda arguments: {"text": arguments["text"].upper()},
+            )
+        )
+        fixture = _fixture(
+            model=FakeModel(
+                kind=DecisionKind.TOOL_CALL,
+                tool_name="uppercase",
+                tool_arguments={"text": "hello"},
+            ),
+            tool_executor=SyncToolExecutor(registry),
+        )
+
+        result = fixture.runner.run_once("sess-1")
+
+        self.assertTrue(result.activated)
+        self.assertEqual(result.session.status, SessionStatus.IDLE)
+        self.assertEqual(result.tool_result.tool_name, "uppercase")
+        self.assertTrue(result.tool_result.ok)
+        self.assertEqual(result.tool_result.output["text"], "HELLO")
+        self.assertEqual([event.event_type for event in result.events], [
+            "signal_received",
+            "decision_produced",
+            "tool_call_requested",
+            "tool_result_produced",
+        ])
+
+        pending = fixture.inbox_store.list_for_session("sess-1")
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0].signal_type, "tool_result")
+        self.assertEqual(pending[0].payload["result"]["output"]["text"], "HELLO")
+        self.assertEqual(result.checkpoint.event_sequence, 3)
+        self.assertEqual(result.checkpoint.state["tool_result"]["output"]["text"], "HELLO")
+
+    def test_run_once_tool_call_requires_executor(self) -> None:
+        fixture = _fixture(model=FakeModel(kind=DecisionKind.TOOL_CALL, tool_name="missing"))
+
+        with self.assertRaises(DecisionRejectedError):
+            fixture.runner.run_once("sess-1")
+
+        self.assertEqual(fixture.inbox_store.list_for_session("sess-1")[0].signal_id, "sig-1")
+        self.assertEqual(fixture.event_store.list_for_session("sess-1"), ())
+
     def test_basic_session_example_smoke(self) -> None:
         result = run_basic_session()
 
@@ -139,6 +190,7 @@ def _fixture(
     *,
     model: object = FakeModel(),
     enqueue_signal: bool = True,
+    tool_executor: SyncToolExecutor | None = None,
 ) -> RunnerFixture:
     clock = FixedClock(NOW)
     agent = AgentDefinition(
@@ -179,6 +231,7 @@ def _fixture(
             inbox_store=inbox_store,
             event_store=event_store,
             checkpoint_store=checkpoint_store,
+            tool_executor=tool_executor,
             clock=clock,
         ),
         session_store=session_store,

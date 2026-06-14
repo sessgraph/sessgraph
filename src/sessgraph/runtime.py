@@ -25,6 +25,7 @@ from sessgraph.stores import (
     InMemorySessionStore,
     RecordNotFoundError,
 )
+from sessgraph.tools import SyncToolExecutor, ToolResult
 
 
 class DecisionRejectedError(ValueError):
@@ -60,6 +61,7 @@ class ActivationResult:
     decision: Decision | None = None
     events: tuple[Event, ...] = ()
     checkpoint: Checkpoint | None = None
+    tool_result: ToolResult | None = None
 
 
 @dataclass(slots=True)
@@ -72,6 +74,7 @@ class ActivationRunner:
     inbox_store: InMemoryInboxStore
     event_store: InMemoryEventStore
     checkpoint_store: InMemoryCheckpointStore
+    tool_executor: SyncToolExecutor | None = None
     clock: Callable[[], datetime] = field(default_factory=lambda: _utcnow)
 
     def run_once(self, session_id: str) -> ActivationResult:
@@ -99,6 +102,7 @@ class ActivationRunner:
         )
         decision = self.model.decide(context)
         self._validate_decision(decision, session_id)
+        tool_result = self._execute_tool_call(decision)
 
         running = self.session_store.update(running, expected_revision=session.revision)
         signal_event = self._append_event(
@@ -118,9 +122,29 @@ class ActivationRunner:
             payload={"decision": decision.to_dict()},
             source_signal_id=signal.signal_id,
         )
+        events = [signal_event, decision_event]
+
+        if tool_result is not None:
+            tool_call_event = self._append_event(
+                session_id=session_id,
+                event_type="tool_call_requested",
+                payload={
+                    "decision_id": decision.decision_id,
+                    "tool_name": tool_result.tool_name,
+                    "arguments": decision.payload["arguments"],
+                },
+                source_signal_id=signal.signal_id,
+            )
+            tool_result_event = self._append_event(
+                session_id=session_id,
+                event_type="tool_result_produced",
+                payload={"decision_id": decision.decision_id, "result": tool_result.to_dict()},
+                source_signal_id=signal.signal_id,
+            )
+            events.extend([tool_call_event, tool_result_event])
 
         final_status = _status_for_decision(decision)
-        checkpoint_id = _checkpoint_id(session_id, running.revision + 1, decision_event.sequence)
+        checkpoint_id = _checkpoint_id(session_id, running.revision + 1, events[-1].sequence)
         final_session = replace(
             running,
             status=final_status,
@@ -134,8 +158,23 @@ class ActivationRunner:
             session=final_session,
             signal=signal,
             decision=decision,
-            events=(signal_event, decision_event),
+            events=tuple(events),
+            tool_result=tool_result,
         )
+        if tool_result is not None:
+            self.inbox_store.enqueue(
+                Signal(
+                    signal_id=_tool_result_signal_id(session_id, decision.decision_id),
+                    session_id=session_id,
+                    signal_type="tool_result",
+                    payload={
+                        "decision_id": decision.decision_id,
+                        "result": tool_result.to_dict(),
+                    },
+                    created_at=self._now(),
+                    idempotency_key=f"tool_result:{decision.decision_id}",
+                )
+            )
         popped = self.inbox_store.pop_next(session_id)
         if popped is None or popped.signal_id != signal.signal_id:
             raise DecisionRejectedError("pending signal changed during activation")
@@ -146,8 +185,9 @@ class ActivationRunner:
             session=final_session,
             signal=signal,
             decision=decision,
-            events=(signal_event, decision_event),
+            events=tuple(events),
             checkpoint=checkpoint,
+            tool_result=tool_result,
         )
 
     def _append_event(
@@ -178,18 +218,23 @@ class ActivationRunner:
         signal: Signal,
         decision: Decision,
         events: tuple[Event, ...],
+        tool_result: ToolResult | None,
     ) -> Checkpoint:
+        state: JsonObject = {
+            "session": session.to_dict(),
+            "signal": signal.to_dict(),
+            "decision": decision.to_dict(),
+            "event_ids": [event.event_id for event in events],
+        }
+        if tool_result is not None:
+            state["tool_result"] = tool_result.to_dict()
+
         checkpoint = Checkpoint(
             checkpoint_id=checkpoint_id,
             session_id=session.session_id,
             session_revision=session.revision,
             event_sequence=events[-1].sequence,
-            state={
-                "session": session.to_dict(),
-                "signal": signal.to_dict(),
-                "decision": decision.to_dict(),
-                "event_ids": [event.event_id for event in events],
-            },
+            state=state,
             created_at=self._now(),
         )
         return self.checkpoint_store.save(checkpoint)
@@ -199,8 +244,19 @@ class ActivationRunner:
             raise DecisionRejectedError(
                 f"decision session_id {decision.session_id} does not match {session_id}"
             )
-        if decision.kind not in {DecisionKind.FINAL_ANSWER, DecisionKind.NOOP}:
+        supported_kinds = {DecisionKind.FINAL_ANSWER, DecisionKind.NOOP, DecisionKind.TOOL_CALL}
+        if decision.kind not in supported_kinds:
             raise DecisionRejectedError(f"unsupported decision kind: {decision.kind.value}")
+
+    def _execute_tool_call(self, decision: Decision) -> ToolResult | None:
+        if decision.kind is not DecisionKind.TOOL_CALL:
+            return None
+        if self.tool_executor is None:
+            raise DecisionRejectedError("tool_executor is required for tool_call decisions")
+        return self.tool_executor.execute(
+            tool_name=str(decision.payload["tool_name"]),
+            arguments=decision.payload["arguments"],
+        )
 
     def _now(self) -> datetime:
         current = self.clock()
@@ -214,6 +270,8 @@ def _status_for_decision(decision: Decision) -> SessionStatus:
         return SessionStatus.COMPLETED
     if decision.kind is DecisionKind.NOOP:
         return SessionStatus.IDLE
+    if decision.kind is DecisionKind.TOOL_CALL:
+        return SessionStatus.IDLE
     raise DecisionRejectedError(f"unsupported decision kind: {decision.kind.value}")
 
 
@@ -223,6 +281,10 @@ def _event_id(session_id: str, sequence: int, event_type: str) -> str:
 
 def _checkpoint_id(session_id: str, session_revision: int, event_sequence: int) -> str:
     return f"{session_id}:checkpoint:{session_revision}:{event_sequence}"
+
+
+def _tool_result_signal_id(session_id: str, decision_id: str) -> str:
+    return f"{session_id}:signal:tool_result:{decision_id}"
 
 
 def _utcnow() -> datetime:
