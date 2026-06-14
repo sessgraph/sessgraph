@@ -23,7 +23,7 @@ P0 只做本地、确定性、可测试的 runtime core：
 
 - AgentDefinition、Session、Signal、Event、Decision、Checkpoint 数据模型已完成。
 - Session Inbox 和 Activation Runner。
-- InMemory stores 和 FakeModel adapter。
+- InMemory stores 已完成；FakeModel adapter 待实现。
 - durable Session 闭环稳定后，再加入同步 Tool execution。
 - 确定性测试和最小可运行 example。
 

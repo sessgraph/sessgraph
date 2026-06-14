@@ -1,7 +1,7 @@
 # 产品 PR 队列
 
 > 状态: 当前
-> 最近更新: 2026-06-12
+> 最近更新: 2026-06-14
 
 本文件是可独立 review 的产品工作的权威队列。每个 PR 都应足够小，可以作为一个连贯变更被 review 和测试。
 
@@ -13,7 +13,7 @@
 | PR-0001F | 已完成 | 处理规划 review 意见并新增中文统一流程 | `docs/tasks/T-0003-review-planning-files.md` | 仅 docs/process/index/ADR/OpenAPI 占位；不实现 runtime | Markdown/文件一致性检查；git diff review |
 | PR-0001G | 已完成 | 将 agent 指令和规划文档统一为中文 | `docs/tasks/T-0004-localize-agent-docs.md` | root agent 指令、README、docs/state、docs/tasks 的中文化；不实现 runtime | Markdown/文件一致性检查；git diff review |
 | PR-0002 | 已完成 | 定义 P0 核心数据结构 | `docs/tasks/T-0002-p0-data-model.md` | AgentDefinition、Session、Signal、Event、Decision、Checkpoint 数据类型和测试 | 构造、校验、序列化单元测试 |
-| PR-0003 | 拟议 | 实现 InMemory stores | TBD | SessionStore、InboxStore、EventStore、CheckpointStore | 包含幂等性的确定性 store 测试 |
+| PR-0003 | 已完成 | 实现 InMemory stores | `docs/tasks/T-0005-p0-inmemory-stores.md` | SessionStore、InboxStore、EventStore、CheckpointStore | 包含幂等性的确定性 store 测试 |
 | PR-0004 | 拟议 | 构建最小 Activation Runner 循环 | TBD | FakeModel + final_answer Decision + basic example | 单元测试和 example smoke test |
 | PR-0005 | 拟议 | 增加同步 tool execution flow | TBD | ToolSpec、ToolRegistry、SyncToolExecutor | Tool 成功/失败测试 |
 | PR-0006 | 拟议 | 增加 wait/resume user flow | TBD | ask_user Decision 和 user_message Signal resume | waiting/resume 测试 |
@@ -35,6 +35,13 @@
 - 新增 ADR-0001，记录 Python 3.12、dataclasses、JSON-compatible `schema_version: 1`、Signal/Event 幂等字段和 Checkpoint 恢复边界。
 - 新增标准库 `unittest` 覆盖构造校验、序列化 round-trip 和严格 JSON payload。
 - 未实现 Activation Runner、InMemory stores、tool execution、wait/resume、provider integration、database 或 server mode。
+
+## PR-0003 完成记录
+
+- 新增 `InMemorySessionStore`、`InMemoryInboxStore`、`InMemoryEventStore`、`InMemoryCheckpointStore`。
+- Store 层覆盖 Session revision 乐观并发、Signal idempotency、Event append-only sequence 和 Checkpoint latest lookup。
+- 新增标准库 `unittest` 覆盖 store 行为和边界条件。
+- 未实现 Activation Runner、FakeModel、tool execution、wait/resume、provider integration、database 或 server mode。
 
 ## 队列纪律
 
