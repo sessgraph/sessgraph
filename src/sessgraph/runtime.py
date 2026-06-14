@@ -244,7 +244,12 @@ class ActivationRunner:
             raise DecisionRejectedError(
                 f"decision session_id {decision.session_id} does not match {session_id}"
             )
-        supported_kinds = {DecisionKind.FINAL_ANSWER, DecisionKind.NOOP, DecisionKind.TOOL_CALL}
+        supported_kinds = {
+            DecisionKind.FINAL_ANSWER,
+            DecisionKind.NOOP,
+            DecisionKind.TOOL_CALL,
+            DecisionKind.ASK_USER,
+        }
         if decision.kind not in supported_kinds:
             raise DecisionRejectedError(f"unsupported decision kind: {decision.kind.value}")
 
@@ -272,6 +277,8 @@ def _status_for_decision(decision: Decision) -> SessionStatus:
         return SessionStatus.IDLE
     if decision.kind is DecisionKind.TOOL_CALL:
         return SessionStatus.IDLE
+    if decision.kind is DecisionKind.ASK_USER:
+        return SessionStatus.WAITING
     raise DecisionRejectedError(f"unsupported decision kind: {decision.kind.value}")
 
 

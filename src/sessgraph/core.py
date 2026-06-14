@@ -36,6 +36,7 @@ class DecisionKind(str, Enum):
     NOOP = "noop"
     FINAL_ANSWER = "final_answer"
     TOOL_CALL = "tool_call"
+    ASK_USER = "ask_user"
 
 
 @dataclass(frozen=True, slots=True)
@@ -244,6 +245,8 @@ class Decision:
         if self.kind is DecisionKind.TOOL_CALL:
             _require_non_empty("payload.tool_name", self.payload.get("tool_name"))
             _copy_json_object("payload.arguments", self.payload.get("arguments"))
+        if self.kind is DecisionKind.ASK_USER:
+            _require_non_empty("payload.question", self.payload.get("question"))
 
     def to_dict(self) -> JsonObject:
         return {

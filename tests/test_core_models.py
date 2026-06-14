@@ -150,6 +150,30 @@ class CoreModelTests(unittest.TestCase):
                     created_at=NOW,
                 )
 
+    def test_decision_round_trips_and_validates_ask_user(self) -> None:
+        decision = Decision(
+            decision_id="dec-ask-1",
+            session_id="sess-1",
+            kind="ask_user",
+            payload={"question": "What should I do next?"},
+            created_at=NOW,
+        )
+
+        restored = Decision.from_dict(decision.to_dict())
+
+        self.assertEqual(restored, decision)
+        self.assertEqual(restored.kind, DecisionKind.ASK_USER)
+
+        for payload in ({}, {"question": ""}):
+            with self.assertRaises(ValidationError):
+                Decision(
+                    decision_id="dec-ask-invalid",
+                    session_id="sess-1",
+                    kind=DecisionKind.ASK_USER,
+                    payload=payload,
+                    created_at=NOW,
+                )
+
     def test_checkpoint_round_trips(self) -> None:
         checkpoint = Checkpoint(
             checkpoint_id="chk-1",

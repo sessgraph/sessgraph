@@ -16,7 +16,7 @@
 | PR-0003 | 已完成 | 实现 InMemory stores | `docs/tasks/T-0005-p0-inmemory-stores.md` | SessionStore、InboxStore、EventStore、CheckpointStore | 包含幂等性的确定性 store 测试 |
 | PR-0004 | 已完成 | 构建最小 Activation Runner 循环 | `docs/tasks/T-0006-p0-activation-runner.md` | FakeModel + final_answer Decision + basic example | 单元测试和 example smoke test |
 | PR-0005 | 已完成 | 增加同步 tool execution flow | `docs/tasks/T-0007-sync-tool-execution.md` | ToolSpec、ToolRegistry、SyncToolExecutor | Tool 成功/失败测试 |
-| PR-0006 | 拟议 | 增加 wait/resume user flow | TBD | ask_user Decision 和 user_message Signal resume | waiting/resume 测试 |
+| PR-0006 | 已完成 | 增加 wait/resume user flow | `docs/tasks/T-0008-wait-resume-user-flow.md` | ask_user Decision 和 user_message Signal resume | waiting/resume 测试 |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -58,6 +58,15 @@
 - 新增 ADR-0003，记录同步 tool execution 语义。
 - 新增标准库 `unittest` 覆盖工具注册、成功执行、失败结果、未知工具和 runner tool flow。
 - 未实现 wait/resume、async job/timer、approval/authorization、provider integration、database 或 server mode。
+
+## PR-0006 完成记录
+
+- 新增 `DecisionKind.ASK_USER` 和 ask_user payload 校验。
+- Runner 支持 `ask_user` Decision，将 Session 置为 `waiting` 并保存 Checkpoint。
+- `user_message` Signal 可恢复 waiting Session 并继续 activation。
+- 新增 ADR-0004，记录 P0 wait/resume user flow 语义。
+- 新增标准库 `unittest` 覆盖 ask_user、waiting inactive 和 user_message resume。
+- 未实现 UI、timeout/timer、approval/authorization、provider integration、database 或 server mode。
 
 ## 队列纪律
 

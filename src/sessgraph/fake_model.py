@@ -16,6 +16,7 @@ class FakeModel:
     final_answer: str | None = None
     tool_name: str | None = None
     tool_arguments: JsonObject | None = None
+    question: str | None = None
 
     def decide(self, context: ActivationContext) -> Decision:
         if self.kind is DecisionKind.NOOP:
@@ -35,6 +36,14 @@ class FakeModel:
                     "tool_name": self.tool_name or "echo",
                     "arguments": self.tool_arguments or {},
                 },
+                created_at=context.now,
+            )
+        if self.kind is DecisionKind.ASK_USER:
+            return Decision(
+                decision_id=_decision_id(context),
+                session_id=context.session.session_id,
+                kind=DecisionKind.ASK_USER,
+                payload={"question": self.question or "Please provide more information."},
                 created_at=context.now,
             )
 
