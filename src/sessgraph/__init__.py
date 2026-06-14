@@ -13,6 +13,14 @@ from sessgraph.core import (
     Signal,
     ValidationError,
 )
+from sessgraph.fake_model import FakeModel
+from sessgraph.runtime import (
+    ActivationContext,
+    ActivationResult,
+    ActivationRunner,
+    DecisionRejectedError,
+    ModelAdapter,
+)
 from sessgraph.stores import (
     ConcurrencyError,
     DuplicateRecordError,
@@ -26,13 +34,18 @@ from sessgraph.stores import (
 )
 
 __all__ = [
+    "ActivationContext",
+    "ActivationResult",
+    "ActivationRunner",
     "AgentDefinition",
     "Checkpoint",
     "ConcurrencyError",
     "Decision",
     "DecisionKind",
+    "DecisionRejectedError",
     "DuplicateRecordError",
     "Event",
+    "FakeModel",
     "IdempotencyConflictError",
     "InMemoryCheckpointStore",
     "InMemoryEventStore",
@@ -40,6 +53,7 @@ __all__ = [
     "InMemorySessionStore",
     "JsonObject",
     "JsonValue",
+    "ModelAdapter",
     "RecordNotFoundError",
     "Session",
     "SessionStatus",

@@ -14,7 +14,7 @@
 | PR-0001G | 已完成 | 将 agent 指令和规划文档统一为中文 | `docs/tasks/T-0004-localize-agent-docs.md` | root agent 指令、README、docs/state、docs/tasks 的中文化；不实现 runtime | Markdown/文件一致性检查；git diff review |
 | PR-0002 | 已完成 | 定义 P0 核心数据结构 | `docs/tasks/T-0002-p0-data-model.md` | AgentDefinition、Session、Signal、Event、Decision、Checkpoint 数据类型和测试 | 构造、校验、序列化单元测试 |
 | PR-0003 | 已完成 | 实现 InMemory stores | `docs/tasks/T-0005-p0-inmemory-stores.md` | SessionStore、InboxStore、EventStore、CheckpointStore | 包含幂等性的确定性 store 测试 |
-| PR-0004 | 拟议 | 构建最小 Activation Runner 循环 | TBD | FakeModel + final_answer Decision + basic example | 单元测试和 example smoke test |
+| PR-0004 | 已完成 | 构建最小 Activation Runner 循环 | `docs/tasks/T-0006-p0-activation-runner.md` | FakeModel + final_answer Decision + basic example | 单元测试和 example smoke test |
 | PR-0005 | 拟议 | 增加同步 tool execution flow | TBD | ToolSpec、ToolRegistry、SyncToolExecutor | Tool 成功/失败测试 |
 | PR-0006 | 拟议 | 增加 wait/resume user flow | TBD | ask_user Decision 和 user_message Signal resume | waiting/resume 测试 |
 
@@ -42,6 +42,14 @@
 - Store 层覆盖 Session revision 乐观并发、Signal idempotency、Event append-only sequence 和 Checkpoint latest lookup。
 - 新增标准库 `unittest` 覆盖 store 行为和边界条件。
 - 未实现 Activation Runner、FakeModel、tool execution、wait/resume、provider integration、database 或 server mode。
+
+## PR-0004 完成记录
+
+- 新增 `ActivationRunner`、`ActivationContext`、`ActivationResult` 和 `FakeModel`。
+- Runner 支持一个 pending Signal 激活一次 Session，分发 `final_answer` / `noop` Decision，记录 `signal_received` / `decision_produced` Event，并保存 Checkpoint。
+- 新增 ADR-0002，记录 P0 Activation Runner 最小循环语义。
+- 新增 `examples/basic_session.py` 和 example smoke test。
+- 未实现 tool execution、wait/resume、async job/timer、provider integration、database 或 server mode。
 
 ## 队列纪律
 
