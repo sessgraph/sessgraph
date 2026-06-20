@@ -1,7 +1,7 @@
 # Inbox
 
 > 状态: 当前
-> 最近更新: 2026-06-12
+> 最近更新: 2026-06-20
 
 本文件保存未处理或部分处理的讨论输入。条目在 triage 到 project state、queue item、risk 或 task spec 前只追加、不删除。
 
@@ -36,3 +36,7 @@
 ## 2026-06-12 中文文档本地化要求
 
 Owner 明确要求：`AGENTS.md`、`CLAUDE.md` 也要中文，并且“都要中文的文档”。该要求已整理为 PR-0001G / T-0004，范围是现有面向贡献者和 AI agent 的 Markdown 文档中文化；不改变 runtime 规划和 P0 架构边界。
+
+## 2026-06-20 P0 收尾审查整理
+
+PR-0007 审查确认 PR-0002 到 PR-0006 的基本核心切片已完成。初始任务序列中的 “增加 checkpoint recovery example/test” 尚未实现，已整理为 PR-0008 / T-0010 拟议任务；license 决策仍保留在 ACT-0002。

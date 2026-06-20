@@ -1,7 +1,7 @@
 # 产品 PR 队列
 
 > 状态: 当前
-> 最近更新: 2026-06-14
+> 最近更新: 2026-06-20
 
 本文件是可独立 review 的产品工作的权威队列。每个 PR 都应足够小，可以作为一个连贯变更被 review 和测试。
 
@@ -17,6 +17,8 @@
 | PR-0004 | 已完成 | 构建最小 Activation Runner 循环 | `docs/tasks/T-0006-p0-activation-runner.md` | FakeModel + final_answer Decision + basic example | 单元测试和 example smoke test |
 | PR-0005 | 已完成 | 增加同步 tool execution flow | `docs/tasks/T-0007-sync-tool-execution.md` | ToolSpec、ToolRegistry、SyncToolExecutor | Tool 成功/失败测试 |
 | PR-0006 | 已完成 | 增加 wait/resume user flow | `docs/tasks/T-0008-wait-resume-user-flow.md` | ask_user Decision 和 user_message Signal resume | waiting/resume 测试 |
+| PR-0007 | 已完成 | P0 收尾审查与后续立项整理 | `docs/tasks/T-0009-p0-closeout-review.md` | 审查 PR-0002 到 PR-0006 的实现、测试、ADR 和状态一致性 | `make check`、basic example、compileall |
+| PR-0008 | 拟议 | 增加 checkpoint recovery example/test | `docs/tasks/T-0010-checkpoint-recovery-example.md` | 从 latest Checkpoint 加载并恢复 Session 边界 | checkpoint recovery deterministic test |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -67,6 +69,19 @@
 - 新增 ADR-0004，记录 P0 wait/resume user flow 语义。
 - 新增标准库 `unittest` 覆盖 ask_user、waiting inactive 和 user_message resume。
 - 未实现 UI、timeout/timer、approval/authorization、provider integration、database 或 server mode。
+
+## PR-0007 完成记录
+
+- 对照 P0 范围、任务规格和 ADR 审查 PR-0002 到 PR-0006。
+- 确认基本 runtime core 已覆盖 data model、InMemory stores、Activation Runner、FakeModel、Checkpoint save、同步 tool execution 和 wait/resume。
+- 运行 `make check`、basic example 和 compileall，均通过。
+- 将 `checkpoint recovery example/test` 缺口整理为 PR-0008 / T-0010。
+- 未实现新的 runtime 行为、provider、database、server、GUI 或 async job/timer。
+
+## PR-0008 拟议记录
+
+- 目标是补齐 `docs/state/inbox.md` 中尚未实现的 checkpoint recovery example/test。
+- 该切片应只验证 latest Checkpoint load 和 Session recovery 边界，不改变 Checkpoint 公开序列化格式。
 
 ## 队列纪律
 
