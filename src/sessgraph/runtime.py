@@ -18,6 +18,7 @@ from sessgraph.core import (
     SessionStatus,
     Signal,
 )
+from sessgraph.jobs import InMemoryJobStore, JobRecord, job_id_for_decision
 from sessgraph.stores import (
     InMemoryCheckpointStore,
     InMemoryEventStore,
@@ -62,6 +63,7 @@ class ActivationResult:
     events: tuple[Event, ...] = ()
     checkpoint: Checkpoint | None = None
     tool_result: ToolResult | None = None
+    job: JobRecord | None = None
 
 
 @dataclass(slots=True)
@@ -75,6 +77,7 @@ class ActivationRunner:
     event_store: InMemoryEventStore
     checkpoint_store: InMemoryCheckpointStore
     tool_executor: SyncToolExecutor | None = None
+    job_store: InMemoryJobStore | None = None
     clock: Callable[[], datetime] = field(default_factory=lambda: _utcnow)
 
     def run_once(self, session_id: str) -> ActivationResult:
@@ -103,6 +106,7 @@ class ActivationRunner:
         decision = self.model.decide(context)
         self._validate_decision(decision, session_id)
         tool_result = self._execute_tool_call(decision)
+        job = self._submit_job(decision)
 
         running = self.session_store.update(running, expected_revision=session.revision)
         signal_event = self._append_event(
@@ -143,6 +147,19 @@ class ActivationRunner:
             )
             events.extend([tool_call_event, tool_result_event])
 
+        if job is not None:
+            job_event = self._append_event(
+                session_id=session_id,
+                event_type="job_submitted",
+                payload={
+                    "decision_id": decision.decision_id,
+                    "job_id": job.job_id,
+                    "job": job.to_dict(),
+                },
+                source_signal_id=signal.signal_id,
+            )
+            events.append(job_event)
+
         final_status = _status_for_decision(decision)
         checkpoint_id = _checkpoint_id(session_id, running.revision + 1, events[-1].sequence)
         final_session = replace(
@@ -160,6 +177,7 @@ class ActivationRunner:
             decision=decision,
             events=tuple(events),
             tool_result=tool_result,
+            job=job,
         )
         if tool_result is not None:
             self.inbox_store.enqueue(
@@ -188,6 +206,7 @@ class ActivationRunner:
             events=tuple(events),
             checkpoint=checkpoint,
             tool_result=tool_result,
+            job=job,
         )
 
     def _append_event(
@@ -219,6 +238,7 @@ class ActivationRunner:
         decision: Decision,
         events: tuple[Event, ...],
         tool_result: ToolResult | None,
+        job: JobRecord | None,
     ) -> Checkpoint:
         state: JsonObject = {
             "session": session.to_dict(),
@@ -228,6 +248,8 @@ class ActivationRunner:
         }
         if tool_result is not None:
             state["tool_result"] = tool_result.to_dict()
+        if job is not None:
+            state["job"] = job.to_dict()
 
         checkpoint = Checkpoint(
             checkpoint_id=checkpoint_id,
@@ -249,6 +271,7 @@ class ActivationRunner:
             DecisionKind.NOOP,
             DecisionKind.TOOL_CALL,
             DecisionKind.ASK_USER,
+            DecisionKind.SUBMIT_JOB,
         }
         if decision.kind not in supported_kinds:
             raise DecisionRejectedError(f"unsupported decision kind: {decision.kind.value}")
@@ -261,6 +284,23 @@ class ActivationRunner:
         return self.tool_executor.execute(
             tool_name=str(decision.payload["tool_name"]),
             arguments=decision.payload["arguments"],
+        )
+
+    def _submit_job(self, decision: Decision) -> JobRecord | None:
+        if decision.kind is not DecisionKind.SUBMIT_JOB:
+            return None
+        if self.job_store is None:
+            raise DecisionRejectedError("job_store is required for submit_job decisions")
+        return self.job_store.submit(
+            JobRecord(
+                job_id=job_id_for_decision(decision.session_id, decision.decision_id),
+                session_id=decision.session_id,
+                decision_id=decision.decision_id,
+                job_type=str(decision.payload["job_type"]),
+                arguments=decision.payload["arguments"],
+                created_at=decision.created_at,
+                idempotency_key=_optional_payload_string(decision, "idempotency_key"),
+            )
         )
 
     def _now(self) -> datetime:
@@ -279,6 +319,8 @@ def _status_for_decision(decision: Decision) -> SessionStatus:
         return SessionStatus.IDLE
     if decision.kind is DecisionKind.ASK_USER:
         return SessionStatus.WAITING
+    if decision.kind is DecisionKind.SUBMIT_JOB:
+        return SessionStatus.IDLE
     raise DecisionRejectedError(f"unsupported decision kind: {decision.kind.value}")
 
 
@@ -292,6 +334,13 @@ def _checkpoint_id(session_id: str, session_revision: int, event_sequence: int) 
 
 def _tool_result_signal_id(session_id: str, decision_id: str) -> str:
     return f"{session_id}:signal:tool_result:{decision_id}"
+
+
+def _optional_payload_string(decision: Decision, field_name: str) -> str | None:
+    value = decision.payload.get(field_name)
+    if value is None:
+        return None
+    return str(value)
 
 
 def _utcnow() -> datetime:

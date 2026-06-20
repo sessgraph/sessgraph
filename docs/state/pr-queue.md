@@ -23,7 +23,7 @@
 | PR-0010 | 延后 | package/release hygiene | `docs/tasks/T-0012-package-release-hygiene.md` | 最小 Python package 元数据、安装说明、import smoke test；license 依赖 Owner 决策 | `make check`、import smoke、example smoke |
 | PR-0011 | 已完成 | ADR 定义 async job/timer 语义 | `docs/tasks/T-0013-async-job-timer-adr.md` | Signal/Event/Decision/Checkpoint/store 边界；不实现 runtime | ADR review |
 | PR-0012 | 已完成 | InMemory timer flow | `docs/tasks/T-0014-inmemory-timer-flow.md` | 本地 timer store、due 查询、timer Signal 唤醒 Session | deterministic timer tests；`make check` |
-| PR-0013 | 拟议 | InMemory async job flow | `docs/tasks/T-0015-inmemory-async-job-flow.md` | 本地 job lifecycle、job result Signal 回灌 Session | deterministic job tests；`make check` |
+| PR-0013 | 已完成 | InMemory async job flow | `docs/tasks/T-0015-inmemory-async-job-flow.md` | 本地 job lifecycle、job result Signal 回灌 Session | deterministic job tests；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -123,9 +123,14 @@
 - 新增 `examples/timer_session.py` 和 `tests/test_timers.py`。
 - 未新增 timer Decision kind，未实现 async job、真实 scheduler、production queue、database、server 或 cloud。
 
-## PR-0013 拟议记录
+## PR-0013 完成记录
 
-- PR-0013 必须遵循 ADR-0005 中的 `submit_job` Decision、JobRecord lifecycle 和 `job_result` Signal 边界。
+- 新增 `DecisionKind.SUBMIT_JOB`，并校验 `job_type`、`arguments` 和可选 `idempotency_key`。
+- 新增 `JobRecord`、`JobStatus`、`InMemoryJobStore` 和 `JobResultDispatcher`。
+- Runner 对 `submit_job` Decision 只创建本地 JobRecord，记录 `job_submitted` Event，并将 Session 返回 `idle`。
+- `JobResultDispatcher` 将 succeeded/failed JobRecord 转换为普通 `job_result` Signal，并记录 `job_result_enqueued` Event。
+- 新增 `examples/async_job_session.py` 和 `tests/test_jobs.py`。
+- 未实现真实 worker pool、production queue、database、server、cloud、provider adapter、timer flow 或 approval/auth。
 
 ## 队列纪律
 

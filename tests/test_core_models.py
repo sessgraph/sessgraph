@@ -174,6 +174,41 @@ class CoreModelTests(unittest.TestCase):
                     created_at=NOW,
                 )
 
+    def test_decision_round_trips_and_validates_submit_job(self) -> None:
+        decision = Decision(
+            decision_id="dec-job-1",
+            session_id="sess-1",
+            kind="submit_job",
+            payload={
+                "job_type": "export",
+                "arguments": {"format": "json"},
+                "idempotency_key": "job-request-1",
+            },
+            created_at=NOW,
+        )
+
+        restored = Decision.from_dict(decision.to_dict())
+
+        self.assertEqual(restored, decision)
+        self.assertEqual(restored.kind, DecisionKind.SUBMIT_JOB)
+
+        invalid_payloads = (
+            {},
+            {"job_type": "", "arguments": {}},
+            {"job_type": "export"},
+            {"job_type": "export", "arguments": []},
+            {"job_type": "export", "arguments": {}, "idempotency_key": ""},
+        )
+        for payload in invalid_payloads:
+            with self.assertRaises(ValidationError):
+                Decision(
+                    decision_id="dec-job-invalid",
+                    session_id="sess-1",
+                    kind=DecisionKind.SUBMIT_JOB,
+                    payload=payload,
+                    created_at=NOW,
+                )
+
     def test_checkpoint_round_trips(self) -> None:
         checkpoint = Checkpoint(
             checkpoint_id="chk-1",

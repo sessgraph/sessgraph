@@ -17,6 +17,9 @@ class FakeModel:
     tool_name: str | None = None
     tool_arguments: JsonObject | None = None
     question: str | None = None
+    job_type: str | None = None
+    job_arguments: JsonObject | None = None
+    job_idempotency_key: str | None = None
 
     def decide(self, context: ActivationContext) -> Decision:
         if self.kind is DecisionKind.NOOP:
@@ -44,6 +47,20 @@ class FakeModel:
                 session_id=context.session.session_id,
                 kind=DecisionKind.ASK_USER,
                 payload={"question": self.question or "Please provide more information."},
+                created_at=context.now,
+            )
+        if self.kind is DecisionKind.SUBMIT_JOB:
+            payload: JsonObject = {
+                "job_type": self.job_type or "demo_job",
+                "arguments": self.job_arguments or {},
+            }
+            if self.job_idempotency_key is not None:
+                payload["idempotency_key"] = self.job_idempotency_key
+            return Decision(
+                decision_id=_decision_id(context),
+                session_id=context.session.session_id,
+                kind=DecisionKind.SUBMIT_JOB,
+                payload=payload,
                 created_at=context.now,
             )
 

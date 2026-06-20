@@ -1,6 +1,6 @@
 # T-0015: InMemory async job flow
 
-> 状态: 拟议
+> 状态: 已完成
 > PR: PR-0013
 > 最近更新: 2026-06-20
 
@@ -36,3 +36,12 @@
 - job result Signal 唤醒 Session 的 runner 测试。
 - job failure 数据化结果测试。
 - `make check`。
+
+## 完成记录
+
+- 新增 `DecisionKind.SUBMIT_JOB` 和 submit_job payload 校验。
+- 新增 `src/sessgraph/jobs.py`，包含 `JobRecord`、`JobStatus`、`InMemoryJobStore` 和 `JobResultDispatcher`。
+- Activation Runner 支持 `submit_job` Decision：只创建本地 JobRecord、记录 `job_submitted` Event，并将 Session 返回 `idle`。
+- `JobResultDispatcher` 将 succeeded/failed JobRecord 转换为普通 `job_result` Signal，并记录 `job_result_enqueued` Event。
+- 新增 `examples/async_job_session.py` 和 `tests/test_jobs.py`，覆盖 job lifecycle、result Signal 回灌、失败数据化结果，以及 runner 被 job_result Signal 唤醒。
+- 遵循 ADR-0005：未实现真实 worker pool、production queue、database、server、cloud、provider adapter、timer flow 或 approval/auth。

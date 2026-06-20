@@ -14,6 +14,12 @@ from sessgraph.core import (
     ValidationError,
 )
 from sessgraph.fake_model import FakeModel
+from sessgraph.jobs import (
+    InMemoryJobStore,
+    JobRecord,
+    JobResultDispatcher,
+    JobStatus,
+)
 from sessgraph.runtime import (
     ActivationContext,
     ActivationResult,
@@ -66,8 +72,12 @@ __all__ = [
     "InMemoryCheckpointStore",
     "InMemoryEventStore",
     "InMemoryInboxStore",
+    "InMemoryJobStore",
     "InMemorySessionStore",
     "InMemoryTimerStore",
+    "JobRecord",
+    "JobResultDispatcher",
+    "JobStatus",
     "JsonObject",
     "JsonValue",
     "ModelAdapter",

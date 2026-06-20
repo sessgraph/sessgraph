@@ -27,7 +27,7 @@ P0 只做本地、确定性、可测试的 runtime core：
 - 其他后续能力应重新立项后再进入实现。
 - 确定性测试和最小可运行 example。
 
-第二阶段 / P1 聚焦本地调度语义与开源可用性：license/package hygiene 已延后，async job/timer ADR 和 InMemory timer flow 已完成，下一步是 InMemory async job flow。真实 provider、database、production queue、server、cloud、GUI、memory/context 和 parent/child session 仍需后续单独立项。
+第二阶段 / P1 聚焦本地调度语义与开源可用性：license/package hygiene 已延后，async job/timer ADR、InMemory timer flow 和 InMemory async job flow 已完成。真实 provider、database、production queue、server、cloud、GUI、memory/context 和 parent/child session 仍需后续单独立项。
 
 P0 明确不做：真实 LLM provider、数据库、Web server、云部署、GUI、复杂多 Agent 编排、业务逻辑。
 

@@ -51,14 +51,13 @@ P0 已证明 durable Session runtime 的本地核心闭环：Session、Signal、
 | PR-0010 | 延后 | package/release hygiene | 在 license 决策后补齐最小 Python package 元数据、安装说明和 import smoke test。 |
 | PR-0011 | 已完成 | ADR: async job/timer 语义 | 定义 timer/job 的 Signal、Event、Decision、Checkpoint 边界，不写 runtime 代码。 |
 | PR-0012 | 已完成 | InMemory timer flow | 基于 ADR 实现本地 timer scheduling 和 deterministic tests。 |
-| PR-0013 | 拟议 | InMemory async job flow | 基于 ADR 实现本地 async job lifecycle、job result Signal 回灌和 deterministic tests。 |
+| PR-0013 | 已完成 | InMemory async job flow | 基于 ADR 实现本地 async job lifecycle、job result Signal 回灌和 deterministic tests。 |
 
 ## 阶段顺序
 
 1. PR-0010 随 Owner license 决策延后；延后期间不能声称仓库已具备完整开源发布卫生。
-2. PR-0011 已完成，PR-0012 / PR-0013 必须遵循 ADR-0005。
-3. PR-0012 已完成，PR-0013 继续保持独立切片，不与 timer 机制混在一个 PR 中。
-4. 完成 PR-0013 后，再重新评估是否进入 Memory + Context、Safety/Auth 或 Parent/Child Session。
+2. PR-0011 已完成，PR-0012 / PR-0013 已按 ADR-0005 拆分落地。
+3. PR-0012 / PR-0013 完成后，下一步重新评估是否进入 Memory + Context、Safety/Auth 或 Parent/Child Session。
 
 ## 当前约束
 

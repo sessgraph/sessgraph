@@ -37,6 +37,7 @@ class DecisionKind(str, Enum):
     FINAL_ANSWER = "final_answer"
     TOOL_CALL = "tool_call"
     ASK_USER = "ask_user"
+    SUBMIT_JOB = "submit_job"
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,6 +248,12 @@ class Decision:
             _copy_json_object("payload.arguments", self.payload.get("arguments"))
         if self.kind is DecisionKind.ASK_USER:
             _require_non_empty("payload.question", self.payload.get("question"))
+        if self.kind is DecisionKind.SUBMIT_JOB:
+            _require_non_empty("payload.job_type", self.payload.get("job_type"))
+            _copy_json_object("payload.arguments", self.payload.get("arguments"))
+            idempotency_key = self.payload.get("idempotency_key")
+            if idempotency_key is not None:
+                _require_non_empty("payload.idempotency_key", idempotency_key)
 
     def to_dict(self) -> JsonObject:
         return {
