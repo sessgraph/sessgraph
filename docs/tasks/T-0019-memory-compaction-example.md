@@ -1,0 +1,37 @@
+# T-0019: deterministic memory compaction example/test
+
+> 状态: 拟议
+> PR: PR-0017
+> 最近更新: 2026-06-20
+
+## 目标
+
+基于 Memory + Context ADR 和 InMemory context builder，补齐 deterministic memory compaction 的示例和测试，证明长 Session 可以在本地压缩 context 并保留恢复边界。
+
+## 范围
+
+范围内：
+
+- deterministic compaction policy 的最小实现或 fixture。
+- compaction 输入、输出、Event 和 Checkpoint 边界测试。
+- 最小 example 或 smoke test。
+- 明确 compaction 后 activation 仍保持 provider-independent。
+
+范围外：
+
+- 不调用真实 LLM summarizer。
+- 不使用 embedding、vector database、server、cloud 或网络调用。
+- 不实现 Safety/Auth。
+- 不实现 Parent/Child Session。
+- 不实现生产级 token accounting。
+
+## 依赖
+
+- PR-0015 Memory + Context ADR 已完成。
+- PR-0016 InMemory context builder 已完成。
+
+## 验证
+
+- deterministic compaction tests。
+- example smoke test。
+- `make check`。

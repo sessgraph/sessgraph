@@ -24,6 +24,10 @@
 | PR-0011 | 已完成 | ADR 定义 async job/timer 语义 | `docs/tasks/T-0013-async-job-timer-adr.md` | Signal/Event/Decision/Checkpoint/store 边界；不实现 runtime | ADR review |
 | PR-0012 | 已完成 | InMemory timer flow | `docs/tasks/T-0014-inmemory-timer-flow.md` | 本地 timer store、due 查询、timer Signal 唤醒 Session | deterministic timer tests；`make check` |
 | PR-0013 | 已完成 | InMemory async job flow | `docs/tasks/T-0015-inmemory-async-job-flow.md` | 本地 job lifecycle、job result Signal 回灌 Session | deterministic job tests；`make check` |
+| PR-0014 | 已完成 | P1 后续方向重评估 | `docs/tasks/T-0016-post-p1-reevaluation.md` | 评估 Memory + Context、Safety/Auth、Parent/Child Session 并固化后续顺序；不实现 runtime | 文档 diff review；`make check` |
+| PR-0015 | 拟议 | ADR 定义 Memory + Context 语义 | `docs/tasks/T-0017-memory-context-adr.md` | Context builder、memory record、compaction、Event/Checkpoint 边界；不实现 runtime | ADR review |
+| PR-0016 | 拟议 | InMemory context builder | `docs/tasks/T-0018-inmemory-context-builder.md` | 基于 ADR 构造 deterministic ActivationContext 输入 | deterministic context tests；`make check` |
+| PR-0017 | 拟议 | deterministic memory compaction example/test | `docs/tasks/T-0019-memory-compaction-example.md` | 本地 memory compaction 边界、Event/Checkpoint 示例和测试 | deterministic compaction tests；example smoke；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -131,6 +135,14 @@
 - `JobResultDispatcher` 将 succeeded/failed JobRecord 转换为普通 `job_result` Signal，并记录 `job_result_enqueued` Event。
 - 新增 `examples/async_job_session.py` 和 `tests/test_jobs.py`。
 - 未实现真实 worker pool、production queue、database、server、cloud、provider adapter、timer flow 或 approval/auth。
+
+## PR-0014 完成记录
+
+- 新增 `docs/state/post-p1-reevaluation.md`，对比 Memory + Context、Safety/Auth、Parent/Child Session。
+- 结论：下一阶段优先进入 Memory + Context；先做 ADR，再做本地确定性实现。
+- 新增 PR-0015 到 PR-0017 拟议切片，覆盖 Memory + Context ADR、InMemory context builder 和 deterministic memory compaction example/test。
+- Safety/Auth 暂不混入 Memory + Context，后续单独 ADR。
+- Parent/Child Session 暂缓，等 context、capability/approval 和 reducer merge boundary 更清楚后再立项。
 
 ## 队列纪律
 

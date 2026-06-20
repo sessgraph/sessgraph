@@ -57,10 +57,14 @@ P0 已证明 durable Session runtime 的本地核心闭环：Session、Signal、
 
 1. PR-0010 随 Owner license 决策延后；延后期间不能声称仓库已具备完整开源发布卫生。
 2. PR-0011 已完成，PR-0012 / PR-0013 已按 ADR-0005 拆分落地。
-3. PR-0012 / PR-0013 完成后，下一步重新评估是否进入 Memory + Context、Safety/Auth 或 Parent/Child Session。
+3. PR-0012 / PR-0013 完成后，PR-0014 已完成 P1 后续方向重评估；结论写入 `docs/state/post-p1-reevaluation.md`。
 
 ## 当前约束
 
 - ACT-0002 已延后，PR-0010 随之延后。
 - 第二阶段仍不允许真实网络、真实 LLM、数据库或生产队列。
 - 如果实现需要修改 Session、Signal、Event、Decision 或 Checkpoint 的公开字段，必须先更新或新增 ADR。
+
+## 后续衔接
+
+P1 后续方向重评估结论是优先进入 Memory + Context，并将 PR-0015 到 PR-0017 作为下一组拟议切片。Safety/Auth 与 Parent/Child Session 暂不启动，后续各自先走 ADR。
