@@ -48,20 +48,20 @@ P0 已证明 durable Session runtime 的本地核心闭环：Session、Signal、
 | ID | 状态 | 标题 | 目标 |
 | --- | --- | --- | --- |
 | PR-0009 | 已完成 | 规划第二阶段 | 固化本文件和后续队列。 |
-| PR-0010 | 拟议 | package/release hygiene | 在 license 决策后补齐最小 Python package 元数据、安装说明和 import smoke test。 |
-| PR-0011 | 拟议 | ADR: async job/timer 语义 | 定义 timer/job 的 Signal、Event、Decision、Checkpoint 边界，不写 runtime 代码。 |
+| PR-0010 | 延后 | package/release hygiene | 在 license 决策后补齐最小 Python package 元数据、安装说明和 import smoke test。 |
+| PR-0011 | 已完成 | ADR: async job/timer 语义 | 定义 timer/job 的 Signal、Event、Decision、Checkpoint 边界，不写 runtime 代码。 |
 | PR-0012 | 拟议 | InMemory timer flow | 基于 ADR 实现本地 timer scheduling 和 deterministic tests。 |
 | PR-0013 | 拟议 | InMemory async job flow | 基于 ADR 实现本地 async job lifecycle、job result Signal 回灌和 deterministic tests。 |
 
 ## 阶段顺序
 
-1. 先处理 PR-0010 或明确记录 license/package 延后。若 Owner 尚未决定 license，不阻塞 PR-0011 的 ADR 工作，但不能声称仓库已具备完整开源发布卫生。
-2. PR-0011 必须先于 PR-0012 / PR-0013，因为 timer/job 会改变公开 runtime 语义。
+1. PR-0010 随 Owner license 决策延后；延后期间不能声称仓库已具备完整开源发布卫生。
+2. PR-0011 已完成，PR-0012 / PR-0013 必须遵循 ADR-0005。
 3. PR-0012 与 PR-0013 可以按风险拆分；不要在同一 PR 中同时实现 timer 和 job。
 4. 完成 PR-0012 / PR-0013 后，再重新评估是否进入 Memory + Context、Safety/Auth 或 Parent/Child Session。
 
 ## 当前约束
 
-- ACT-0002 仍等待 Owner 确认 license。
+- ACT-0002 已延后，PR-0010 随之延后。
 - 第二阶段仍不允许真实网络、真实 LLM、数据库或生产队列。
 - 如果实现需要修改 Session、Signal、Event、Decision 或 Checkpoint 的公开字段，必须先更新或新增 ADR。

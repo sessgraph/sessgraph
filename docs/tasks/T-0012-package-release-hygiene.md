@@ -1,6 +1,6 @@
 # T-0012: package/release hygiene
 
-> 状态: 拟议
+> 状态: 延后
 > PR: PR-0010
 > 最近更新: 2026-06-20
 
@@ -28,7 +28,7 @@
 
 ## 依赖
 
-- ACT-0002：Owner 确认 license，或明确记录延后 license 决策。
+- ACT-0002：Owner 已明确延后 license 决策；本任务随 license 决策延后。
 
 ## 验证
 

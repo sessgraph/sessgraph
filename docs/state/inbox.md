@@ -44,3 +44,7 @@ PR-0007 审查确认 PR-0002 到 PR-0006 的基本核心切片已完成。初始
 ## 2026-06-20 checkpoint recovery 立项完成
 
 PR-0008 / T-0010 已补齐 checkpoint recovery example/test。初始任务序列中的 P0 本地核心闭环已完成；后续 package/release hygiene、async job/timer 或其他 v0.3+ 工作仍需重新立项。
+
+## 2026-06-20 license 延后
+
+Owner 明确表示 license 先延后，先做其他第二阶段工作。该输入已回写到 ACT-0002，并使 PR-0010 / T-0012 延后；后续优先推进 PR-0011 async job/timer ADR 以及 PR-0012 / PR-0013。

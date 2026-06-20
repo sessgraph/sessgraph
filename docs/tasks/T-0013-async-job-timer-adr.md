@@ -1,6 +1,6 @@
 # T-0013: ADR 定义 async job/timer 语义
 
-> 状态: 拟议
+> 状态: 已完成
 > PR: PR-0011
 > 最近更新: 2026-06-20
 
@@ -29,11 +29,19 @@
 
 ## 实现前问题
 
-1. Timer 是否只由 runtime 内部 store 管理，还是也需要 Decision kind 表达 model 请求 timer？
-2. Async job 是否需要新增 Decision kind，还是先通过 tool result / external Signal 语义表达？
-3. Job failure 是否统一作为数据化 `job_result` Signal，还是要新增 failed Session 状态转移？
+1. Timer 只由 runtime-side InMemory timer store 管理；P1 不新增 timer Decision kind。
+2. Async job 需要新增 `DecisionKind.SUBMIT_JOB`，因为 model 需要表达 runtime 分发异步工作的请求。
+3. Job failure 统一作为数据化 `job_result` Signal，不自动将 Session 置为 `failed`。
 
 ## 验证
 
 - ADR review。
 - 队列和后续任务范围与 ADR 保持一致。
+
+## 完成记录
+
+- 新增 `docs/adr/0005-async-job-timer-semantics.md`。
+- 明确 timer 通过 `timer` Signal 唤醒 Session，不新增 timer Decision kind。
+- 明确 async job 通过 `submit_job` Decision 创建 JobRecord，并通过 `job_result` Signal 回灌 Session。
+- 明确 `job_submitted` / `job_result_enqueued` Event 边界。
+- 明确 P1 仍只使用 InMemory stores、FakeModel 和 deterministic tests。

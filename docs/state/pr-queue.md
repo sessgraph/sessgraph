@@ -20,8 +20,8 @@
 | PR-0007 | 已完成 | P0 收尾审查与后续立项整理 | `docs/tasks/T-0009-p0-closeout-review.md` | 审查 PR-0002 到 PR-0006 的实现、测试、ADR 和状态一致性 | `make check`、basic example、compileall |
 | PR-0008 | 已完成 | 增加 checkpoint recovery example/test | `docs/tasks/T-0010-checkpoint-recovery-example.md` | 从 latest Checkpoint 加载并恢复 Session 边界 | checkpoint recovery deterministic test 和 example smoke test |
 | PR-0009 | 已完成 | 规划第二阶段 | `docs/tasks/T-0011-phase-two-planning.md` | 固化第二阶段目标、非目标、成功标准和后续 PR 切片 | 文档 diff review；`make check` |
-| PR-0010 | 拟议 | package/release hygiene | `docs/tasks/T-0012-package-release-hygiene.md` | 最小 Python package 元数据、安装说明、import smoke test；license 依赖 Owner 决策 | `make check`、import smoke、example smoke |
-| PR-0011 | 拟议 | ADR 定义 async job/timer 语义 | `docs/tasks/T-0013-async-job-timer-adr.md` | Signal/Event/Decision/Checkpoint/store 边界；不实现 runtime | ADR review |
+| PR-0010 | 延后 | package/release hygiene | `docs/tasks/T-0012-package-release-hygiene.md` | 最小 Python package 元数据、安装说明、import smoke test；license 依赖 Owner 决策 | `make check`、import smoke、example smoke |
+| PR-0011 | 已完成 | ADR 定义 async job/timer 语义 | `docs/tasks/T-0013-async-job-timer-adr.md` | Signal/Event/Decision/Checkpoint/store 边界；不实现 runtime | ADR review |
 | PR-0012 | 拟议 | InMemory timer flow | `docs/tasks/T-0014-inmemory-timer-flow.md` | 本地 timer store、due 查询、timer Signal 唤醒 Session | deterministic timer tests；`make check` |
 | PR-0013 | 拟议 | InMemory async job flow | `docs/tasks/T-0015-inmemory-async-job-flow.md` | 本地 job lifecycle、job result Signal 回灌 Session | deterministic job tests；`make check` |
 
@@ -97,10 +97,22 @@
 - 明确第二阶段仍不实现真实 provider、database、production queue、server、cloud、GUI、memory/context 或 parent/child session。
 - 未实现 runtime 代码。
 
-## PR-0010 到 PR-0013 拟议记录
+## PR-0010 延后记录
 
-- PR-0010 依赖 Owner 对 ACT-0002 的 license 决策，或明确记录延后 license。
-- PR-0011 必须先于 PR-0012 / PR-0013，因为 timer/job 会改变公开 runtime 语义。
+- Owner 已明确 license 决策先延后，因此 PR-0010 package/release hygiene 随 ACT-0002 延后。
+- 延后期间不能声称仓库已具备完整开源发布卫生。
+
+## PR-0011 完成记录
+
+- 新增 ADR-0005，定义 P1 async job/timer 语义。
+- Timer 决策：P1 由 runtime-side InMemory timer store 管理，到期后 enqueue `timer` Signal；不新增 timer Decision kind。
+- Async job 决策：新增 `DecisionKind.SUBMIT_JOB`，runtime 创建 JobRecord，完成后 enqueue `job_result` Signal。
+- Job failure 决策：作为 `job_result` 数据化结果，不自动将 Session 置为 `failed`。
+- 明确 PR-0012 / PR-0013 仍只允许 InMemory stores、FakeModel 和 deterministic tests，不引入真实 queue、database、worker、server 或 provider。
+
+## PR-0012 到 PR-0013 拟议记录
+
+- PR-0012 和 PR-0013 必须遵循 ADR-0005。
 - PR-0012 与 PR-0013 应拆开实现，避免在一个 PR 中同时修改 timer 和 job 两个核心机制。
 
 ## 队列纪律
