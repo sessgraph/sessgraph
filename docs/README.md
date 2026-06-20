@@ -1,15 +1,16 @@
 # SessGraph 文档索引
 
 > 状态: 当前
-> 最近更新: 2026-06-12
+> 最近更新: 2026-06-20
 
 ## 开始阅读
 
 1. `docs/state/project-status.md`：当前状态和下一步。
 2. `docs/state/project-state.md`：项目目标、边界、P0 范围。
-3. `docs/DEVELOPMENT_PROCESS.md`：统一开发流程。
-4. `docs/state/pr-queue.md`：产品 PR 队列。
-5. `docs/tasks/`：任务规格。
+3. `docs/state/phase-two-plan.md`：P0 后第二阶段规划。
+4. `docs/DEVELOPMENT_PROCESS.md`：统一开发流程。
+5. `docs/state/pr-queue.md`：产品 PR 队列。
+6. `docs/tasks/`：任务规格。
 
 ## 目录说明
 

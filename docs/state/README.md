@@ -8,6 +8,7 @@
 | --- | --- |
 | `project-state.md` | 稳定的项目目标、范围边界和不变量。 |
 | `project-status.md` | 当前阶段、当前主线和下一步的第一入口。 |
+| `phase-two-plan.md` | P0 后第二阶段的目标、非目标、成功标准和建议 PR 切片。 |
 | `pr-queue.md` | 产品 PR 队列的权威来源。 |
 | `action-queue.md` | 跨主题的运营、文档或流程行动项。 |
 | `risks.md` | 当前风险和缓解措施。 |

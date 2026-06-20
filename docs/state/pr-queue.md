@@ -19,6 +19,11 @@
 | PR-0006 | 已完成 | 增加 wait/resume user flow | `docs/tasks/T-0008-wait-resume-user-flow.md` | ask_user Decision 和 user_message Signal resume | waiting/resume 测试 |
 | PR-0007 | 已完成 | P0 收尾审查与后续立项整理 | `docs/tasks/T-0009-p0-closeout-review.md` | 审查 PR-0002 到 PR-0006 的实现、测试、ADR 和状态一致性 | `make check`、basic example、compileall |
 | PR-0008 | 已完成 | 增加 checkpoint recovery example/test | `docs/tasks/T-0010-checkpoint-recovery-example.md` | 从 latest Checkpoint 加载并恢复 Session 边界 | checkpoint recovery deterministic test 和 example smoke test |
+| PR-0009 | 已完成 | 规划第二阶段 | `docs/tasks/T-0011-phase-two-planning.md` | 固化第二阶段目标、非目标、成功标准和后续 PR 切片 | 文档 diff review；`make check` |
+| PR-0010 | 拟议 | package/release hygiene | `docs/tasks/T-0012-package-release-hygiene.md` | 最小 Python package 元数据、安装说明、import smoke test；license 依赖 Owner 决策 | `make check`、import smoke、example smoke |
+| PR-0011 | 拟议 | ADR 定义 async job/timer 语义 | `docs/tasks/T-0013-async-job-timer-adr.md` | Signal/Event/Decision/Checkpoint/store 边界；不实现 runtime | ADR review |
+| PR-0012 | 拟议 | InMemory timer flow | `docs/tasks/T-0014-inmemory-timer-flow.md` | 本地 timer store、due 查询、timer Signal 唤醒 Session | deterministic timer tests；`make check` |
+| PR-0013 | 拟议 | InMemory async job flow | `docs/tasks/T-0015-inmemory-async-job-flow.md` | 本地 job lifecycle、job result Signal 回灌 Session | deterministic job tests；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -84,6 +89,19 @@
 - 新增 `tests/test_checkpoint_recovery.py`，覆盖 latest checkpoint load、Session recovery、event boundary 和 Checkpoint round-trip recovery。
 - 不新增 public helper，不改变 Checkpoint 公开序列化格式。
 - 未实现 file persistence、database、queue、crash recovery framework、provider、server、GUI 或 async job/timer。
+
+## PR-0009 完成记录
+
+- 新增 `docs/state/phase-two-plan.md`，定义第二阶段 / P1 为 “本地调度语义与开源可用性”。
+- 新增 PR-0010 到 PR-0013 拟议切片，覆盖 package/release hygiene、async job/timer ADR、InMemory timer flow 和 InMemory async job flow。
+- 明确第二阶段仍不实现真实 provider、database、production queue、server、cloud、GUI、memory/context 或 parent/child session。
+- 未实现 runtime 代码。
+
+## PR-0010 到 PR-0013 拟议记录
+
+- PR-0010 依赖 Owner 对 ACT-0002 的 license 决策，或明确记录延后 license。
+- PR-0011 必须先于 PR-0012 / PR-0013，因为 timer/job 会改变公开 runtime 语义。
+- PR-0012 与 PR-0013 应拆开实现，避免在一个 PR 中同时修改 timer 和 job 两个核心机制。
 
 ## 队列纪律
 
