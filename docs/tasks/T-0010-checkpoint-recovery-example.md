@@ -1,6 +1,6 @@
 # T-0010: 增加 checkpoint recovery example/test
 
-> 状态: 拟议
+> 状态: 已完成
 > PR: PR-0008
 > 最近更新: 2026-06-20
 
@@ -30,7 +30,14 @@
 - 新增 deterministic unit test 覆盖 latest checkpoint load 和 session recovery。
 - `make check` 通过。
 
-## 实现前问题
+## 实现决策
 
-1. 仅用测试直接调用 `Session.from_dict(checkpoint.state["session"])` 是否足够，还是需要暴露一个小 helper？
-2. recovery example 放在 `tests/` 即可，还是需要同步扩展 `examples/basic_session.py` 或新增独立 example？
+1. 不新增 public helper；P0 直接使用 `Session.from_dict(checkpoint.state["session"])` 验证恢复边界。
+2. 新增独立 `examples/checkpoint_recovery.py`，避免扩大 `examples/basic_session.py` 的职责。
+3. Checkpoint 公开序列化格式不变，恢复验证只依赖已有 `schema_version: 1` JSON-compatible dict。
+
+## 完成记录
+
+- 新增 `examples/checkpoint_recovery.py`，演示从 latest Checkpoint 恢复 Session snapshot。
+- 新增 `tests/test_checkpoint_recovery.py`，覆盖 latest checkpoint load、Session recovery、event boundary 和 Checkpoint round-trip recovery。
+- 未新增外部依赖，未实现 file persistence、database、queue、crash recovery framework、provider、server、GUI 或 async job/timer。

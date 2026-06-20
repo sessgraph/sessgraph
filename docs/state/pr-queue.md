@@ -18,7 +18,7 @@
 | PR-0005 | 已完成 | 增加同步 tool execution flow | `docs/tasks/T-0007-sync-tool-execution.md` | ToolSpec、ToolRegistry、SyncToolExecutor | Tool 成功/失败测试 |
 | PR-0006 | 已完成 | 增加 wait/resume user flow | `docs/tasks/T-0008-wait-resume-user-flow.md` | ask_user Decision 和 user_message Signal resume | waiting/resume 测试 |
 | PR-0007 | 已完成 | P0 收尾审查与后续立项整理 | `docs/tasks/T-0009-p0-closeout-review.md` | 审查 PR-0002 到 PR-0006 的实现、测试、ADR 和状态一致性 | `make check`、basic example、compileall |
-| PR-0008 | 拟议 | 增加 checkpoint recovery example/test | `docs/tasks/T-0010-checkpoint-recovery-example.md` | 从 latest Checkpoint 加载并恢复 Session 边界 | checkpoint recovery deterministic test |
+| PR-0008 | 已完成 | 增加 checkpoint recovery example/test | `docs/tasks/T-0010-checkpoint-recovery-example.md` | 从 latest Checkpoint 加载并恢复 Session 边界 | checkpoint recovery deterministic test 和 example smoke test |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -78,10 +78,12 @@
 - 将 `checkpoint recovery example/test` 缺口整理为 PR-0008 / T-0010。
 - 未实现新的 runtime 行为、provider、database、server、GUI 或 async job/timer。
 
-## PR-0008 拟议记录
+## PR-0008 完成记录
 
-- 目标是补齐 `docs/state/inbox.md` 中尚未实现的 checkpoint recovery example/test。
-- 该切片应只验证 latest Checkpoint load 和 Session recovery 边界，不改变 Checkpoint 公开序列化格式。
+- 新增 `examples/checkpoint_recovery.py`，演示从 latest Checkpoint 恢复 Session snapshot。
+- 新增 `tests/test_checkpoint_recovery.py`，覆盖 latest checkpoint load、Session recovery、event boundary 和 Checkpoint round-trip recovery。
+- 不新增 public helper，不改变 Checkpoint 公开序列化格式。
+- 未实现 file persistence、database、queue、crash recovery framework、provider、server、GUI 或 async job/timer。
 
 ## 队列纪律
 

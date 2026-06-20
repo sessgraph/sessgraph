@@ -40,3 +40,7 @@ Owner 明确要求：`AGENTS.md`、`CLAUDE.md` 也要中文，并且“都要中
 ## 2026-06-20 P0 收尾审查整理
 
 PR-0007 审查确认 PR-0002 到 PR-0006 的基本核心切片已完成。初始任务序列中的 “增加 checkpoint recovery example/test” 尚未实现，已整理为 PR-0008 / T-0010 拟议任务；license 决策仍保留在 ACT-0002。
+
+## 2026-06-20 checkpoint recovery 立项完成
+
+PR-0008 / T-0010 已补齐 checkpoint recovery example/test。初始任务序列中的 P0 本地核心闭环已完成；后续 package/release hygiene、async job/timer 或其他 v0.3+ 工作仍需重新立项。
