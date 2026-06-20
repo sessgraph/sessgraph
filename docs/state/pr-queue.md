@@ -22,7 +22,7 @@
 | PR-0009 | 已完成 | 规划第二阶段 | `docs/tasks/T-0011-phase-two-planning.md` | 固化第二阶段目标、非目标、成功标准和后续 PR 切片 | 文档 diff review；`make check` |
 | PR-0010 | 延后 | package/release hygiene | `docs/tasks/T-0012-package-release-hygiene.md` | 最小 Python package 元数据、安装说明、import smoke test；license 依赖 Owner 决策 | `make check`、import smoke、example smoke |
 | PR-0011 | 已完成 | ADR 定义 async job/timer 语义 | `docs/tasks/T-0013-async-job-timer-adr.md` | Signal/Event/Decision/Checkpoint/store 边界；不实现 runtime | ADR review |
-| PR-0012 | 拟议 | InMemory timer flow | `docs/tasks/T-0014-inmemory-timer-flow.md` | 本地 timer store、due 查询、timer Signal 唤醒 Session | deterministic timer tests；`make check` |
+| PR-0012 | 已完成 | InMemory timer flow | `docs/tasks/T-0014-inmemory-timer-flow.md` | 本地 timer store、due 查询、timer Signal 唤醒 Session | deterministic timer tests；`make check` |
 | PR-0013 | 拟议 | InMemory async job flow | `docs/tasks/T-0015-inmemory-async-job-flow.md` | 本地 job lifecycle、job result Signal 回灌 Session | deterministic job tests；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
@@ -110,10 +110,22 @@
 - Job failure 决策：作为 `job_result` 数据化结果，不自动将 Session 置为 `failed`。
 - 明确 PR-0012 / PR-0013 仍只允许 InMemory stores、FakeModel 和 deterministic tests，不引入真实 queue、database、worker、server 或 provider。
 
-## PR-0012 到 PR-0013 拟议记录
+## PR-0012 / PR-0013 ADR 约束记录
 
 - PR-0012 和 PR-0013 必须遵循 ADR-0005。
 - PR-0012 与 PR-0013 应拆开实现，避免在一个 PR 中同时修改 timer 和 job 两个核心机制。
+
+## PR-0012 完成记录
+
+- 新增 `TimerRecord`、`TimerStatus`、`InMemoryTimerStore` 和 `TimerDispatcher`。
+- `TimerDispatcher` 将 due TimerRecord 转换为普通 `timer` Signal 并 enqueue 到 Session inbox。
+- Runner 被 timer Signal 唤醒后复用现有 `signal_received` / `decision_produced` Event 和 Checkpoint 语义。
+- 新增 `examples/timer_session.py` 和 `tests/test_timers.py`。
+- 未新增 timer Decision kind，未实现 async job、真实 scheduler、production queue、database、server 或 cloud。
+
+## PR-0013 拟议记录
+
+- PR-0013 必须遵循 ADR-0005 中的 `submit_job` Decision、JobRecord lifecycle 和 `job_result` Signal 边界。
 
 ## 队列纪律
 
