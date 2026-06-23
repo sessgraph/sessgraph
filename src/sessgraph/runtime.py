@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Protocol
 
+from sessgraph.context import ContextBuilder, ContextSnapshot
 from sessgraph.core import (
     AgentDefinition,
     Checkpoint,
@@ -42,6 +43,7 @@ class ActivationContext:
     signal: Signal
     events: tuple[Event, ...]
     now: datetime
+    context_snapshot: ContextSnapshot | None = None
 
 
 class ModelAdapter(Protocol):
@@ -64,6 +66,7 @@ class ActivationResult:
     checkpoint: Checkpoint | None = None
     tool_result: ToolResult | None = None
     job: JobRecord | None = None
+    context_snapshot: ContextSnapshot | None = None
 
 
 @dataclass(slots=True)
@@ -78,6 +81,7 @@ class ActivationRunner:
     checkpoint_store: InMemoryCheckpointStore
     tool_executor: SyncToolExecutor | None = None
     job_store: InMemoryJobStore | None = None
+    context_builder: ContextBuilder | None = None
     clock: Callable[[], datetime] = field(default_factory=lambda: _utcnow)
 
     def run_once(self, session_id: str) -> ActivationResult:
@@ -96,12 +100,18 @@ class ActivationRunner:
             updated_at=self._now(),
             revision=session.revision + 1,
         )
+        context_snapshot = self._build_context(running, signal)
         context = ActivationContext(
             agent=self.agent,
             session=running,
             signal=signal,
-            events=self.event_store.list_for_session(session_id),
+            events=(
+                context_snapshot.event_window
+                if context_snapshot is not None
+                else self.event_store.list_for_session(session_id)
+            ),
             now=self._now(),
+            context_snapshot=context_snapshot,
         )
         decision = self.model.decide(context)
         self._validate_decision(decision, session_id)
@@ -178,6 +188,7 @@ class ActivationRunner:
             events=tuple(events),
             tool_result=tool_result,
             job=job,
+            context_snapshot=context_snapshot,
         )
         if tool_result is not None:
             self.inbox_store.enqueue(
@@ -207,6 +218,7 @@ class ActivationRunner:
             checkpoint=checkpoint,
             tool_result=tool_result,
             job=job,
+            context_snapshot=context_snapshot,
         )
 
     def _append_event(
@@ -239,6 +251,7 @@ class ActivationRunner:
         events: tuple[Event, ...],
         tool_result: ToolResult | None,
         job: JobRecord | None,
+        context_snapshot: ContextSnapshot | None,
     ) -> Checkpoint:
         state: JsonObject = {
             "session": session.to_dict(),
@@ -246,6 +259,8 @@ class ActivationRunner:
             "decision": decision.to_dict(),
             "event_ids": [event.event_id for event in events],
         }
+        if context_snapshot is not None:
+            state["context_snapshot"] = _context_snapshot_metadata(context_snapshot)
         if tool_result is not None:
             state["tool_result"] = tool_result.to_dict()
         if job is not None:
@@ -260,6 +275,11 @@ class ActivationRunner:
             created_at=self._now(),
         )
         return self.checkpoint_store.save(checkpoint)
+
+    def _build_context(self, session: Session, signal: Signal) -> ContextSnapshot | None:
+        if self.context_builder is None:
+            return None
+        return self.context_builder.build(session, signal)
 
     def _validate_decision(self, decision: Decision, session_id: str) -> None:
         if decision.session_id != session_id:
@@ -341,6 +361,19 @@ def _optional_payload_string(decision: Decision, field_name: str) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _context_snapshot_metadata(snapshot: ContextSnapshot) -> JsonObject:
+    return {
+        "session_id": snapshot.session_id,
+        "signal_id": snapshot.signal_id,
+        "event_ids": list(snapshot.event_ids),
+        "memory_ids": list(snapshot.memory_ids),
+        "latest_checkpoint_id": snapshot.latest_checkpoint_id,
+        "built_at": snapshot.to_dict()["built_at"],
+        "ordering": snapshot.to_dict()["ordering"],
+        "limits": snapshot.to_dict()["limits"],
+    }
 
 
 def _utcnow() -> datetime:

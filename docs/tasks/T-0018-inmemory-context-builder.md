@@ -1,8 +1,8 @@
 # T-0018: InMemory context builder
 
-> 状态: 拟议
+> 状态: 已完成
 > PR: PR-0016
-> 最近更新: 2026-06-20
+> 最近更新: 2026-06-23
 
 ## 目标
 
@@ -33,3 +33,11 @@
 - context builder deterministic tests。
 - ActivationRunner context integration test。
 - `make check`。
+
+## 完成记录
+
+- 新增 Session-scoped `MemoryRecord`、`InMemoryMemoryStore`、`ContextSnapshot`、`ContextBuilder` 和 deterministic `memory_id_for_record`。
+- `ContextBuilder` 从 Session、Signal、Event Log、latest Checkpoint 和 memory records 构造 deterministic context，并支持 event window metadata。
+- `ActivationRunner` 可接入 `ContextBuilder`，将 `ContextSnapshot.event_window` 作为 `ActivationContext.events` 兼容视图，并在 Checkpoint state 中记录 context snapshot metadata。
+- 新增 context schema round-trip、ordering、windowing、memory store 幂等性和 runner 集成测试。
+- 已运行 `make check`。

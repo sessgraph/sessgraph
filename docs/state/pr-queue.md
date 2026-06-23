@@ -26,7 +26,7 @@
 | PR-0013 | 已完成 | InMemory async job flow | `docs/tasks/T-0015-inmemory-async-job-flow.md` | 本地 job lifecycle、job result Signal 回灌 Session | deterministic job tests；`make check` |
 | PR-0014 | 已完成 | P1 后续方向重评估 | `docs/tasks/T-0016-post-p1-reevaluation.md` | 评估 Memory + Context、Safety/Auth、Parent/Child Session 并固化后续顺序；不实现 runtime | 文档 diff review；`make check` |
 | PR-0015 | 已完成 | ADR 定义 Memory + Context 语义 | `docs/tasks/T-0017-memory-context-adr.md` | Context builder、memory record、compaction、Event/Checkpoint 边界；不实现 runtime | ADR review |
-| PR-0016 | 拟议 | InMemory context builder | `docs/tasks/T-0018-inmemory-context-builder.md` | 基于 ADR 构造 deterministic ActivationContext 输入 | deterministic context tests；`make check` |
+| PR-0016 | 已完成 | InMemory context builder | `docs/tasks/T-0018-inmemory-context-builder.md` | 基于 ADR 构造 deterministic ActivationContext 输入 | deterministic context tests；`make check` |
 | PR-0017 | 拟议 | deterministic memory compaction example/test | `docs/tasks/T-0019-memory-compaction-example.md` | 本地 memory compaction 边界、Event/Checkpoint 示例和测试 | deterministic compaction tests；example smoke；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
@@ -152,6 +152,16 @@
 - 决定 compaction 输出写入 MemoryRecord，并追加 `memory_compacted` Event、保存 Checkpoint 作为恢复边界。
 - 决定 model adapter 接收 ContextSnapshot 作为 canonical context，现有 `ActivationContext.events` 迁移为 event window 兼容视图。
 - 未实现 runtime 代码，未引入真实 summarizer、embedding、vector database、Safety/Auth 或 Parent/Child Session。
+
+## PR-0016 完成记录
+
+- 新增 `MemoryRecord`、`InMemoryMemoryStore`、`ContextSnapshot`、`ContextBuilder` 和 deterministic `memory_id_for_record`。
+- `ContextBuilder` 从 Event Log、Session-scoped memory records 和 latest Checkpoint 构造 activation-time ContextSnapshot。
+- Event window 按 `sequence` 升序，memory records 按 `(created_at, memory_id)` 升序；支持 `max_events` window metadata。
+- `ActivationRunner` 可接入 `ContextBuilder`，并将 `ContextSnapshot.event_window` 作为 `ActivationContext.events` 兼容视图。
+- Activation Checkpoint state 会记录本次 context snapshot metadata，包括 event ids、memory ids、latest checkpoint、ordering 和 limits。
+- 新增 context round-trip、deterministic ordering/windowing、memory store 幂等性和 runner 集成测试；`make check` 通过。
+- 未实现 memory compaction、真实 summarizer、embedding、vector database、Safety/Auth、Parent/Child Session、providers、databases 或 server mode。
 
 ## 队列纪律
 

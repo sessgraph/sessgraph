@@ -13,6 +13,13 @@ from sessgraph.core import (
     Signal,
     ValidationError,
 )
+from sessgraph.context import (
+    ContextBuilder,
+    ContextSnapshot,
+    InMemoryMemoryStore,
+    MemoryRecord,
+    memory_id_for_record,
+)
 from sessgraph.fake_model import FakeModel
 from sessgraph.jobs import (
     InMemoryJobStore,
@@ -61,6 +68,8 @@ __all__ = [
     "AgentDefinition",
     "Checkpoint",
     "ConcurrencyError",
+    "ContextBuilder",
+    "ContextSnapshot",
     "Decision",
     "DecisionKind",
     "DecisionRejectedError",
@@ -73,6 +82,7 @@ __all__ = [
     "InMemoryEventStore",
     "InMemoryInboxStore",
     "InMemoryJobStore",
+    "InMemoryMemoryStore",
     "InMemorySessionStore",
     "InMemoryTimerStore",
     "JobRecord",
@@ -80,6 +90,7 @@ __all__ = [
     "JobStatus",
     "JsonObject",
     "JsonValue",
+    "MemoryRecord",
     "ModelAdapter",
     "RecordNotFoundError",
     "Session",
@@ -96,4 +107,5 @@ __all__ = [
     "ToolResult",
     "ToolSpec",
     "ValidationError",
+    "memory_id_for_record",
 ]
