@@ -30,6 +30,7 @@
 | PR-0017 | 已完成 | deterministic memory compaction example/test | `docs/tasks/T-0019-memory-compaction-example.md` | 本地 memory compaction 边界、Event/Checkpoint 示例和测试 | deterministic compaction tests；example smoke；`make check` |
 | PR-0018 | 已完成 | ADR 定义 Safety/Auth 语义 | `docs/tasks/T-0020-safety-auth-adr.md` | Authorization、approval、capability grant、AuthContext 边界；不实现 runtime | ADR review；`make check` |
 | PR-0019 | 已完成 | InMemory capability policy gate | `docs/tasks/T-0021-inmemory-capability-policy-gate.md` | 本地 AuthContext、CapabilityGrant 和 tool/job authorization gate | auth deterministic tests；runner integration tests；`make check` |
+| PR-0020 | 已完成 | ADR 定义 approval flow 语义 | `docs/tasks/T-0022-approval-flow-adr.md` | ApprovalRequest、approval_result Signal、approval Event/Checkpoint 边界；不实现 runtime | ADR review；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -194,6 +195,15 @@
 - 拒绝授权时追加 `authorization_denied` Event，把 `policy_decision` 写入 Checkpoint，并跳过 tool execution / job creation。
 - 新增 deterministic auth model/store tests 和 runner integration tests；`make check` 通过。
 - 未实现 approval flow、ApprovalRequest store、真实 identity provider、OAuth/OIDC、IAM、production policy DSL、Parent/Child Session 或 capability delegation。
+
+## PR-0020 完成记录
+
+- 新增 ADR-0008，定义 approval flow 语义。
+- 决定 approval-required 是 runtime policy outcome，不新增 Decision kind。
+- 决定 ApprovalRequest 是 durable record；approval result 通过普通 `approval_result` Signal 回灌 Session。
+- 决定 approval request / resolved 都必须追加 Event，并保存 Checkpoint 作为恢复边界。
+- 明确后续首个实现应保持 InMemory、FakeModel 和 deterministic tests。
+- 未实现 runtime 代码、ApprovalRequest store、真实 identity provider、production policy、Parent/Child Session 或 capability delegation。
 
 ## 队列纪律
 
