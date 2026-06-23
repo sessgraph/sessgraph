@@ -67,4 +67,4 @@ P0 已证明 durable Session runtime 的本地核心闭环：Session、Signal、
 
 ## 后续衔接
 
-P1 后续方向重评估结论是优先进入 Memory + Context。PR-0015 Memory + Context ADR 已完成；PR-0016 / PR-0017 作为下一组实现切片。Safety/Auth 与 Parent/Child Session 暂不启动，后续各自先走 ADR。
+P1 后续方向重评估结论是优先进入 Memory + Context。PR-0015 Memory + Context ADR、PR-0016 InMemory context builder 和 PR-0017 deterministic memory compaction example/test 已完成。PR-0018 Safety/Auth ADR 也已完成；Safety/Auth runtime policy gate 和 Parent/Child Session 后续仍需单独排队实现。

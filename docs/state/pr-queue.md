@@ -28,6 +28,7 @@
 | PR-0015 | 已完成 | ADR 定义 Memory + Context 语义 | `docs/tasks/T-0017-memory-context-adr.md` | Context builder、memory record、compaction、Event/Checkpoint 边界；不实现 runtime | ADR review |
 | PR-0016 | 已完成 | InMemory context builder | `docs/tasks/T-0018-inmemory-context-builder.md` | 基于 ADR 构造 deterministic ActivationContext 输入 | deterministic context tests；`make check` |
 | PR-0017 | 已完成 | deterministic memory compaction example/test | `docs/tasks/T-0019-memory-compaction-example.md` | 本地 memory compaction 边界、Event/Checkpoint 示例和测试 | deterministic compaction tests；example smoke；`make check` |
+| PR-0018 | 已完成 | ADR 定义 Safety/Auth 语义 | `docs/tasks/T-0020-safety-auth-adr.md` | Authorization、approval、capability grant、AuthContext 边界；不实现 runtime | ADR review；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -172,6 +173,16 @@
 - `InMemoryMemoryStore` 支持 active memory view；`ContextBuilder` 只把未被 supersede 的 memory records 放入 ContextSnapshot。
 - 新增 `examples/memory_compaction_session.py` 和 deterministic compaction / example smoke tests；`make check` 通过。
 - 未实现真实 summarizer、embedding、vector database、production token accounting、Safety/Auth、Parent/Child Session、providers、databases 或 server mode。
+
+## PR-0018 完成记录
+
+- 新增 ADR-0007，定义 Safety/Auth 语义。
+- 决定 Safety/Auth 是 runtime-side policy boundary，model 不能通过 Decision、prompt 或 payload 自授权。
+- 决定首个实现先支持 Session-scoped CapabilityGrant；Agent/global/cross-session grants 后续单独 ADR。
+- 决定 AuthContext 由宿主 runtime 在 Signal 进入边界时提供，不信任 model payload 自报身份。
+- 决定 Approval 是 runtime-side policy gate，不新增 Decision kind；approval result 通过普通 Signal 回灌。
+- 决定 authorization denial / approval-required 是数据化 runtime outcome，记录 Event 和 Checkpoint，不等同 runtime invariant failure。
+- 未实现 runtime 代码、真实 identity provider、OAuth/OIDC、IAM、policy DSL、ApprovalRequest store 或 Parent/Child Session。
 
 ## 队列纪律
 

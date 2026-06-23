@@ -22,7 +22,7 @@ P0 durable Session runtime core 已完成本地核心闭环。第二阶段 / P1 
 1. PR-0015：ADR 定义 Memory + Context 语义。已完成。
 2. PR-0016：InMemory context builder。已完成。
 3. PR-0017：deterministic memory compaction example/test。已完成。
-4. Safety/Auth 后续单独进入 ADR，不在 Memory + Context 切片中顺手实现。
+4. Safety/Auth 后续单独进入 ADR，不在 Memory + Context 切片中顺手实现。已完成。
 5. Parent/Child Session 暂不启动；等 context、capability/approval 和 reducer 边界更清楚后再立项。
 
 ## 评估
@@ -66,4 +66,4 @@ P0 durable Session runtime core 已完成本地核心闭环。第二阶段 / P1 
 
 ## 当前推荐下一步
 
-Memory + Context 本地确定性闭环已完成。后续不要直接实现未排队能力；需要 Owner 选择是恢复 PR-0010 package/release hygiene 的 license/package 决策，还是为 v0.5 Safety/Auth 新建 ADR 任务。
+Safety/Auth ADR 已完成。后续不要直接实现未排队能力；需要先拆新的实现切片，例如 InMemory capability policy gate，或恢复 PR-0010 package/release hygiene 的 license/package 决策。
