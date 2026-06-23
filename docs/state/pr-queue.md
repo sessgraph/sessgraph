@@ -27,7 +27,7 @@
 | PR-0014 | 已完成 | P1 后续方向重评估 | `docs/tasks/T-0016-post-p1-reevaluation.md` | 评估 Memory + Context、Safety/Auth、Parent/Child Session 并固化后续顺序；不实现 runtime | 文档 diff review；`make check` |
 | PR-0015 | 已完成 | ADR 定义 Memory + Context 语义 | `docs/tasks/T-0017-memory-context-adr.md` | Context builder、memory record、compaction、Event/Checkpoint 边界；不实现 runtime | ADR review |
 | PR-0016 | 已完成 | InMemory context builder | `docs/tasks/T-0018-inmemory-context-builder.md` | 基于 ADR 构造 deterministic ActivationContext 输入 | deterministic context tests；`make check` |
-| PR-0017 | 拟议 | deterministic memory compaction example/test | `docs/tasks/T-0019-memory-compaction-example.md` | 本地 memory compaction 边界、Event/Checkpoint 示例和测试 | deterministic compaction tests；example smoke；`make check` |
+| PR-0017 | 已完成 | deterministic memory compaction example/test | `docs/tasks/T-0019-memory-compaction-example.md` | 本地 memory compaction 边界、Event/Checkpoint 示例和测试 | deterministic compaction tests；example smoke；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -162,6 +162,16 @@
 - Activation Checkpoint state 会记录本次 context snapshot metadata，包括 event ids、memory ids、latest checkpoint、ordering 和 limits。
 - 新增 context round-trip、deterministic ordering/windowing、memory store 幂等性和 runner 集成测试；`make check` 通过。
 - 未实现 memory compaction、真实 summarizer、embedding、vector database、Safety/Auth、Parent/Child Session、providers、databases 或 server mode。
+
+## PR-0017 完成记录
+
+- 新增 `MemoryCompactor`、`DeterministicCompactionPolicy` 和 `MemoryCompactionResult`，用于本地 deterministic memory compaction fixture。
+- Compaction 输出 durable `MemoryRecord`，追加 `memory_compacted` Event，并保存 compaction Checkpoint。
+- `memory_compacted` Event payload 包含 `memory_id`、`source_event_ids`、`supersedes_memory_ids` 和 policy metadata。
+- Compaction Checkpoint state 记录新 memory、active memory ids、source event ids、supersedes memory ids 和 compaction Event id。
+- `InMemoryMemoryStore` 支持 active memory view；`ContextBuilder` 只把未被 supersede 的 memory records 放入 ContextSnapshot。
+- 新增 `examples/memory_compaction_session.py` 和 deterministic compaction / example smoke tests；`make check` 通过。
+- 未实现真实 summarizer、embedding、vector database、production token accounting、Safety/Auth、Parent/Child Session、providers、databases 或 server mode。
 
 ## 队列纪律
 

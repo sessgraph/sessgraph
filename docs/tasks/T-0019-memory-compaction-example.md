@@ -1,6 +1,6 @@
 # T-0019: deterministic memory compaction example/test
 
-> 状态: 拟议
+> 状态: 已完成
 > PR: PR-0017
 > 最近更新: 2026-06-23
 
@@ -35,3 +35,11 @@
 - deterministic compaction tests。
 - example smoke test。
 - `make check`。
+
+## 完成记录
+
+- 新增 deterministic `MemoryCompactor`、`DeterministicCompactionPolicy` 和 `MemoryCompactionResult`，仅使用 InMemory stores 和本地确定性输入。
+- Compaction 输出 `MemoryRecord`，追加 `memory_compacted` Event，并保存引用 memory、active memory ids、source event ids 和 compaction Event id 的 Checkpoint。
+- `ContextBuilder` 改为只读取 active memory records，被新 MemoryRecord supersede 的旧 memory 不再进入后续 context。
+- 新增 `examples/memory_compaction_session.py` 和 deterministic compaction / example smoke tests。
+- 已运行 `make check`。

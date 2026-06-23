@@ -20,6 +20,11 @@ from sessgraph.context import (
     MemoryRecord,
     memory_id_for_record,
 )
+from sessgraph.compaction import (
+    DeterministicCompactionPolicy,
+    MemoryCompactionResult,
+    MemoryCompactor,
+)
 from sessgraph.fake_model import FakeModel
 from sessgraph.jobs import (
     InMemoryJobStore,
@@ -73,6 +78,7 @@ __all__ = [
     "Decision",
     "DecisionKind",
     "DecisionRejectedError",
+    "DeterministicCompactionPolicy",
     "DuplicateRecordError",
     "DuplicateToolError",
     "Event",
@@ -91,6 +97,8 @@ __all__ = [
     "JsonObject",
     "JsonValue",
     "MemoryRecord",
+    "MemoryCompactionResult",
+    "MemoryCompactor",
     "ModelAdapter",
     "RecordNotFoundError",
     "Session",

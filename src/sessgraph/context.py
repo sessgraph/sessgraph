@@ -206,6 +206,15 @@ class InMemoryMemoryStore:
         memory_ids = self._memory_ids_by_session.get(session_id, [])
         return tuple(_snapshot_memory(self._memories_by_id[memory_id]) for memory_id in memory_ids)
 
+    def list_active_for_session(self, session_id: str) -> tuple[MemoryRecord, ...]:
+        records = self.list_for_session(session_id)
+        superseded_ids = {
+            memory_id
+            for record in records
+            for memory_id in record.supersedes_memory_ids
+        }
+        return tuple(record for record in records if record.memory_id not in superseded_ids)
+
 
 @dataclass(frozen=True, slots=True)
 class ContextBuilder:
@@ -234,7 +243,7 @@ class ContextBuilder:
         event_window = _window_events(all_events, self.max_events)
         memory_records = tuple(
             sorted(
-                self.memory_store.list_for_session(session.session_id),
+                self.memory_store.list_active_for_session(session.session_id),
                 key=lambda record: (record.created_at, record.memory_id),
             )
         )
