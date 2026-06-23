@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Protocol
 
+from sessgraph.auth import AuthContext, InMemoryPolicyGate, PolicyDecision
 from sessgraph.context import ContextBuilder, ContextSnapshot
 from sessgraph.core import (
     AgentDefinition,
@@ -44,6 +45,7 @@ class ActivationContext:
     events: tuple[Event, ...]
     now: datetime
     context_snapshot: ContextSnapshot | None = None
+    auth_context: AuthContext | None = None
 
 
 class ModelAdapter(Protocol):
@@ -67,6 +69,7 @@ class ActivationResult:
     tool_result: ToolResult | None = None
     job: JobRecord | None = None
     context_snapshot: ContextSnapshot | None = None
+    policy_decision: PolicyDecision | None = None
 
 
 @dataclass(slots=True)
@@ -82,9 +85,15 @@ class ActivationRunner:
     tool_executor: SyncToolExecutor | None = None
     job_store: InMemoryJobStore | None = None
     context_builder: ContextBuilder | None = None
+    policy_gate: InMemoryPolicyGate | None = None
     clock: Callable[[], datetime] = field(default_factory=lambda: _utcnow)
 
-    def run_once(self, session_id: str) -> ActivationResult:
+    def run_once(
+        self,
+        session_id: str,
+        *,
+        auth_context: AuthContext | None = None,
+    ) -> ActivationResult:
         session = self.session_store.get(session_id)
         if session is None:
             raise RecordNotFoundError(f"session does not exist: {session_id}")
@@ -112,11 +121,18 @@ class ActivationRunner:
             ),
             now=self._now(),
             context_snapshot=context_snapshot,
+            auth_context=auth_context,
         )
         decision = self.model.decide(context)
         self._validate_decision(decision, session_id)
-        tool_result = self._execute_tool_call(decision)
-        job = self._submit_job(decision)
+        policy_decision = self._authorize_decision(
+            session=running,
+            decision=decision,
+            auth_context=auth_context,
+        )
+        denied = policy_decision is not None and not policy_decision.allowed
+        tool_result = None if denied else self._execute_tool_call(decision)
+        job = None if denied else self._submit_job(decision)
 
         running = self.session_store.update(running, expected_revision=session.revision)
         signal_event = self._append_event(
@@ -137,6 +153,15 @@ class ActivationRunner:
             source_signal_id=signal.signal_id,
         )
         events = [signal_event, decision_event]
+
+        if denied and policy_decision is not None:
+            authorization_event = self._append_event(
+                session_id=session_id,
+                event_type="authorization_denied",
+                payload=_policy_denial_payload(decision, policy_decision),
+                source_signal_id=signal.signal_id,
+            )
+            events.append(authorization_event)
 
         if tool_result is not None:
             tool_call_event = self._append_event(
@@ -170,7 +195,7 @@ class ActivationRunner:
             )
             events.append(job_event)
 
-        final_status = _status_for_decision(decision)
+        final_status = SessionStatus.IDLE if denied else _status_for_decision(decision)
         checkpoint_id = _checkpoint_id(session_id, running.revision + 1, events[-1].sequence)
         final_session = replace(
             running,
@@ -189,6 +214,7 @@ class ActivationRunner:
             tool_result=tool_result,
             job=job,
             context_snapshot=context_snapshot,
+            policy_decision=policy_decision,
         )
         if tool_result is not None:
             self.inbox_store.enqueue(
@@ -219,6 +245,7 @@ class ActivationRunner:
             tool_result=tool_result,
             job=job,
             context_snapshot=context_snapshot,
+            policy_decision=policy_decision,
         )
 
     def _append_event(
@@ -252,6 +279,7 @@ class ActivationRunner:
         tool_result: ToolResult | None,
         job: JobRecord | None,
         context_snapshot: ContextSnapshot | None,
+        policy_decision: PolicyDecision | None,
     ) -> Checkpoint:
         state: JsonObject = {
             "session": session.to_dict(),
@@ -261,6 +289,8 @@ class ActivationRunner:
         }
         if context_snapshot is not None:
             state["context_snapshot"] = _context_snapshot_metadata(context_snapshot)
+        if policy_decision is not None:
+            state["policy_decision"] = policy_decision.to_dict()
         if tool_result is not None:
             state["tool_result"] = tool_result.to_dict()
         if job is not None:
@@ -280,6 +310,26 @@ class ActivationRunner:
         if self.context_builder is None:
             return None
         return self.context_builder.build(session, signal)
+
+    def _authorize_decision(
+        self,
+        *,
+        session: Session,
+        decision: Decision,
+        auth_context: AuthContext | None,
+    ) -> PolicyDecision | None:
+        if self.policy_gate is None:
+            return None
+        action = _policy_action_for_decision(decision)
+        if action is None:
+            return None
+        action_kind, resource = action
+        return self.policy_gate.authorize(
+            session=session,
+            auth_context=auth_context,
+            action_kind=action_kind,
+            resource=resource,
+        )
 
     def _validate_decision(self, decision: Decision, session_id: str) -> None:
         if decision.session_id != session_id:
@@ -361,6 +411,33 @@ def _optional_payload_string(decision: Decision, field_name: str) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _policy_action_for_decision(decision: Decision) -> tuple[str, JsonObject] | None:
+    if decision.kind is DecisionKind.TOOL_CALL:
+        return decision.kind.value, {"tool_name": str(decision.payload["tool_name"])}
+    if decision.kind is DecisionKind.SUBMIT_JOB:
+        return decision.kind.value, {"job_type": str(decision.payload["job_type"])}
+    return None
+
+
+def _policy_denial_payload(
+    decision: Decision,
+    policy_decision: PolicyDecision,
+) -> JsonObject:
+    decision_data = policy_decision.to_dict()
+    return {
+        "decision_id": decision.decision_id,
+        "action_kind": policy_decision.action_kind,
+        "resource": decision_data["resource"],
+        "actor": decision_data["actor"],
+        "policy": {
+            "policy_id": policy_decision.policy_id,
+            "grant_id": policy_decision.grant_id,
+            "allowed": policy_decision.allowed,
+        },
+        "reason": policy_decision.reason,
+    }
 
 
 def _context_snapshot_metadata(snapshot: ContextSnapshot) -> JsonObject:

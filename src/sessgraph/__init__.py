@@ -13,6 +13,14 @@ from sessgraph.core import (
     Signal,
     ValidationError,
 )
+from sessgraph.auth import (
+    AuthContext,
+    CapabilityGrant,
+    InMemoryCapabilityGrantStore,
+    InMemoryPolicyGate,
+    PolicyDecision,
+    capability_grant_id,
+)
 from sessgraph.context import (
     ContextBuilder,
     ContextSnapshot,
@@ -71,6 +79,8 @@ __all__ = [
     "ActivationResult",
     "ActivationRunner",
     "AgentDefinition",
+    "AuthContext",
+    "CapabilityGrant",
     "Checkpoint",
     "ConcurrencyError",
     "ContextBuilder",
@@ -85,10 +95,12 @@ __all__ = [
     "FakeModel",
     "IdempotencyConflictError",
     "InMemoryCheckpointStore",
+    "InMemoryCapabilityGrantStore",
     "InMemoryEventStore",
     "InMemoryInboxStore",
     "InMemoryJobStore",
     "InMemoryMemoryStore",
+    "InMemoryPolicyGate",
     "InMemorySessionStore",
     "InMemoryTimerStore",
     "JobRecord",
@@ -100,6 +112,7 @@ __all__ = [
     "MemoryCompactionResult",
     "MemoryCompactor",
     "ModelAdapter",
+    "PolicyDecision",
     "RecordNotFoundError",
     "Session",
     "SessionStatus",
@@ -115,5 +128,6 @@ __all__ = [
     "ToolResult",
     "ToolSpec",
     "ValidationError",
+    "capability_grant_id",
     "memory_id_for_record",
 ]

@@ -29,6 +29,7 @@
 | PR-0016 | 已完成 | InMemory context builder | `docs/tasks/T-0018-inmemory-context-builder.md` | 基于 ADR 构造 deterministic ActivationContext 输入 | deterministic context tests；`make check` |
 | PR-0017 | 已完成 | deterministic memory compaction example/test | `docs/tasks/T-0019-memory-compaction-example.md` | 本地 memory compaction 边界、Event/Checkpoint 示例和测试 | deterministic compaction tests；example smoke；`make check` |
 | PR-0018 | 已完成 | ADR 定义 Safety/Auth 语义 | `docs/tasks/T-0020-safety-auth-adr.md` | Authorization、approval、capability grant、AuthContext 边界；不实现 runtime | ADR review；`make check` |
+| PR-0019 | 已完成 | InMemory capability policy gate | `docs/tasks/T-0021-inmemory-capability-policy-gate.md` | 本地 AuthContext、CapabilityGrant 和 tool/job authorization gate | auth deterministic tests；runner integration tests；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -183,6 +184,16 @@
 - 决定 Approval 是 runtime-side policy gate，不新增 Decision kind；approval result 通过普通 Signal 回灌。
 - 决定 authorization denial / approval-required 是数据化 runtime outcome，记录 Event 和 Checkpoint，不等同 runtime invariant failure。
 - 未实现 runtime 代码、真实 identity provider、OAuth/OIDC、IAM、policy DSL、ApprovalRequest store 或 Parent/Child Session。
+
+## PR-0019 完成记录
+
+- 新增 `AuthContext`、`CapabilityGrant`、`PolicyDecision`、`InMemoryCapabilityGrantStore` 和 `InMemoryPolicyGate`。
+- `AuthContext` 是 activation-time 输入；`ActivationRunner.run_once(..., auth_context=...)` 将其传入 model context 和 policy gate。
+- Runtime 在 `tool_call` / `submit_job` Decision schema 校验后、action 分发前执行 authorization gate。
+- policy gate 默认 deny；只有匹配 Session-scoped active grant、actor subject、action kind、resource subset 和 required scopes 时才允许分发。
+- 拒绝授权时追加 `authorization_denied` Event，把 `policy_decision` 写入 Checkpoint，并跳过 tool execution / job creation。
+- 新增 deterministic auth model/store tests 和 runner integration tests；`make check` 通过。
+- 未实现 approval flow、ApprovalRequest store、真实 identity provider、OAuth/OIDC、IAM、production policy DSL、Parent/Child Session 或 capability delegation。
 
 ## 队列纪律
 
