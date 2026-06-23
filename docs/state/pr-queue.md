@@ -1,7 +1,7 @@
 # 产品 PR 队列
 
 > 状态: 当前
-> 最近更新: 2026-06-20
+> 最近更新: 2026-06-23
 
 本文件是可独立 review 的产品工作的权威队列。每个 PR 都应足够小，可以作为一个连贯变更被 review 和测试。
 
@@ -25,7 +25,7 @@
 | PR-0012 | 已完成 | InMemory timer flow | `docs/tasks/T-0014-inmemory-timer-flow.md` | 本地 timer store、due 查询、timer Signal 唤醒 Session | deterministic timer tests；`make check` |
 | PR-0013 | 已完成 | InMemory async job flow | `docs/tasks/T-0015-inmemory-async-job-flow.md` | 本地 job lifecycle、job result Signal 回灌 Session | deterministic job tests；`make check` |
 | PR-0014 | 已完成 | P1 后续方向重评估 | `docs/tasks/T-0016-post-p1-reevaluation.md` | 评估 Memory + Context、Safety/Auth、Parent/Child Session 并固化后续顺序；不实现 runtime | 文档 diff review；`make check` |
-| PR-0015 | 拟议 | ADR 定义 Memory + Context 语义 | `docs/tasks/T-0017-memory-context-adr.md` | Context builder、memory record、compaction、Event/Checkpoint 边界；不实现 runtime | ADR review |
+| PR-0015 | 已完成 | ADR 定义 Memory + Context 语义 | `docs/tasks/T-0017-memory-context-adr.md` | Context builder、memory record、compaction、Event/Checkpoint 边界；不实现 runtime | ADR review |
 | PR-0016 | 拟议 | InMemory context builder | `docs/tasks/T-0018-inmemory-context-builder.md` | 基于 ADR 构造 deterministic ActivationContext 输入 | deterministic context tests；`make check` |
 | PR-0017 | 拟议 | deterministic memory compaction example/test | `docs/tasks/T-0019-memory-compaction-example.md` | 本地 memory compaction 边界、Event/Checkpoint 示例和测试 | deterministic compaction tests；example smoke；`make check` |
 
@@ -143,6 +143,15 @@
 - 新增 PR-0015 到 PR-0017 拟议切片，覆盖 Memory + Context ADR、InMemory context builder 和 deterministic memory compaction example/test。
 - Safety/Auth 暂不混入 Memory + Context，后续单独 ADR。
 - Parent/Child Session 暂缓，等 context、capability/approval 和 reducer merge boundary 更清楚后再立项。
+
+## PR-0015 完成记录
+
+- 新增 ADR-0006，定义 Memory + Context 语义。
+- 决定 P1 后续先支持 Session-scoped memory；Agent-scoped / cross-session memory 后续单独 ADR。
+- 决定 ContextSnapshot 是 activation-time 派生对象，不作为独立 durable store 主记录。
+- 决定 compaction 输出写入 MemoryRecord，并追加 `memory_compacted` Event、保存 Checkpoint 作为恢复边界。
+- 决定 model adapter 接收 ContextSnapshot 作为 canonical context，现有 `ActivationContext.events` 迁移为 event window 兼容视图。
+- 未实现 runtime 代码，未引入真实 summarizer、embedding、vector database、Safety/Auth 或 Parent/Child Session。
 
 ## 队列纪律
 

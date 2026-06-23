@@ -1,8 +1,8 @@
 # T-0017: ADR 定义 Memory + Context 语义
 
-> 状态: 拟议
+> 状态: 已完成
 > PR: PR-0015
-> 最近更新: 2026-06-20
+> 最近更新: 2026-06-23
 
 ## 目标
 
@@ -36,3 +36,12 @@
 - ADR review。
 - 文档 diff review。
 - `make check`。
+
+## 完成记录
+
+- 新增 `docs/adr/0006-memory-context-semantics.md`。
+- 决定 P1 后续先支持 Session-scoped memory；Agent-scoped / cross-session memory 后续单独 ADR。
+- 决定 ContextSnapshot 是 activation-time 派生对象，不作为独立 durable store 主记录。
+- 决定 compaction 输出写入 MemoryRecord，并追加 `memory_compacted` Event、保存 Checkpoint 作为恢复边界。
+- 决定 model adapter 接收 ContextSnapshot 作为 canonical context，现有 `ActivationContext.events` 迁移为 event window 兼容视图。
+- 未实现 runtime 代码，未引入真实 summarizer、embedding、vector database、Safety/Auth 或 Parent/Child Session。

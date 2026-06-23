@@ -2,7 +2,7 @@
 
 > 状态: 拟议
 > PR: PR-0017
-> 最近更新: 2026-06-20
+> 最近更新: 2026-06-23
 
 ## 目标
 
@@ -28,7 +28,7 @@
 ## 依赖
 
 - PR-0015 Memory + Context ADR 已完成。
-- PR-0016 InMemory context builder 已完成。
+- PR-0016 InMemory context builder 完成后执行。
 
 ## 验证
 

@@ -1,7 +1,7 @@
 # P1 后续方向重评估
 
 > 状态: 当前
-> 最近更新: 2026-06-20
+> 最近更新: 2026-06-23
 
 ## 背景
 
@@ -19,7 +19,7 @@ P0 durable Session runtime core 已完成本地核心闭环。第二阶段 / P1 
 
 推荐顺序：
 
-1. PR-0015：ADR 定义 Memory + Context 语义。
+1. PR-0015：ADR 定义 Memory + Context 语义。已完成。
 2. PR-0016：InMemory context builder。
 3. PR-0017：deterministic memory compaction example/test。
 4. Safety/Auth 后续单独进入 ADR，不在 Memory + Context 切片中顺手实现。
@@ -66,4 +66,4 @@ P0 durable Session runtime core 已完成本地核心闭环。第二阶段 / P1 
 
 ## 当前推荐下一步
 
-执行 PR-0015：新增 ADR，先固化 Memory + Context 的公开语义和非目标，不写 runtime 代码。
+执行 PR-0016：基于 ADR-0006 实现 InMemory context builder，不实现 memory compaction、Safety/Auth 或 Parent/Child Session。

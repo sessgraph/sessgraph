@@ -1,7 +1,7 @@
 # SessGraph 文档索引
 
 > 状态: 当前
-> 最近更新: 2026-06-20
+> 最近更新: 2026-06-23
 
 ## 开始阅读
 
@@ -19,7 +19,7 @@
 | --- | --- |
 | `docs/state/` | 当前事实源：状态、队列、风险、输入。 |
 | `docs/tasks/` | 可独立验收任务的规格。 |
-| `docs/adr/` | 架构决策记录；当前包含 P0 核心数据模型、Activation Runner、同步 Tool execution、wait/resume 和 P1 async job/timer 语义决策。 |
+| `docs/adr/` | 架构决策记录；当前包含 P0 核心数据模型、Activation Runner、同步 Tool execution、wait/resume、P1 async job/timer 和 Memory + Context 语义决策。 |
 | `docs/openapi/` | 未来对外 HTTP/API 契约；P0 暂无。 |
 | `docs/DEVELOPMENT_PROCESS.md` | 仓库统一开发流程。 |
 

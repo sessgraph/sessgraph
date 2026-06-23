@@ -1,7 +1,7 @@
 # 风险
 
 > 状态: 当前
-> 最近更新: 2026-06-20
+> 最近更新: 2026-06-23
 
 | ID | 状态 | 风险 | 缓解措施 |
 | --- | --- | --- | --- |
@@ -13,4 +13,4 @@
 | R-0006 | 已缓解 | P0 已保存 Checkpoint，但还缺少显式 checkpoint recovery example/test，容易让 “save/load” 语义停留在隐含用法。 | PR-0008 / T-0010 已补齐 latest Checkpoint load、Session recovery、event boundary 和 round-trip recovery 验证；仍不声称存在完整 crash recovery framework。 |
 | R-0007 | 打开 | 第二阶段可能过早引入真实 provider、database、production queue 或 server，导致 core 边界失焦。 | 第二阶段规划明确只做 package hygiene、ADR、InMemory timer/job 和 deterministic tests；真实集成必须重新立项。 |
 | R-0008 | 已缓解 | 即使 ADR 已完成，timer/job 实现仍可能在 PR-0012 或 PR-0013 中漂移出 ADR-0005 的边界。 | PR-0012 / PR-0013 已按 ADR-0005 分别完成 InMemory timer flow 和 InMemory async job flow，并由 deterministic tests 覆盖；真实集成仍需重新立项。 |
-| R-0009 | 打开 | Memory + Context 容易顺手引入真实 summarizer、embedding、vector database、Safety/Auth 或 Parent/Child Session，导致下一阶段边界失焦。 | PR-0015 先写 Memory + Context ADR；PR-0016 / PR-0017 只允许 InMemory、FakeModel 和 deterministic tests。Safety/Auth 与 Parent/Child Session 后续单独 ADR。 |
+| R-0009 | 打开 | Memory + Context 容易顺手引入真实 summarizer、embedding、vector database、Safety/Auth 或 Parent/Child Session，导致下一阶段边界失焦。 | ADR-0006 已定义 Memory + Context 边界；PR-0016 / PR-0017 只允许 InMemory、FakeModel、deterministic compactor fixture 和 deterministic tests。Safety/Auth 与 Parent/Child Session 后续单独 ADR。 |
