@@ -1,13 +1,13 @@
 # 行动队列
 
 > 状态: 当前
-> 最近更新: 2026-06-20
+> 最近更新: 2026-06-27
 
 本队列记录不属于单个产品 PR 切片的跨主题行动项。
 
 | ID | 状态 | 负责人 | 行动 | 退出标准 |
 | --- | --- | --- | --- | --- |
-| ACT-0002 | 已延后 | Owner | 确认初始 license 选择；基础设施项目大概率使用 Apache-2.0。 | Owner 已明确 license 决策先延后；PR-0010 package/release hygiene 随之延后。 |
+| ACT-0002 | 已完成 | Owner | 确认初始 license 选择。 | Owner 已确认使用 Apache-2.0；PR-0010 package/release hygiene 已完成。 |
 | ACT-0003 | 已完成 | AI | 在第一次架构决策前补齐 ADR 模板。 | `docs/adr/0000-template.md` 已存在。 |
 | ACT-0004 | 已完成 | AI | 补齐中文统一开发流程与文档索引。 | `docs/DEVELOPMENT_PROCESS.md` 和 `docs/README.md` 已存在。 |
 | ACT-0005 | 已完成 | AI | 将 root agent 指令和已有文档统一为中文。 | `AGENTS.md`、`CLAUDE.md`、README、`docs/` 现有 Markdown 文档均以中文为主。 |

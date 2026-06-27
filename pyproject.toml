@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=77.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sessgraph"
+version = "0.0.0"
+description = "Durable session runtime for long-running AI agents."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [
+  { name = "SessGraph contributors" },
+]
+keywords = ["agents", "runtime", "session", "durable", "event-driven"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/sessgraph/sessgraph"
+Repository = "https://github.com/sessgraph/sessgraph"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sessgraph*"]

@@ -1,11 +1,11 @@
 # P1 后续方向重评估
 
 > 状态: 当前
-> 最近更新: 2026-06-23
+> 最近更新: 2026-06-27
 
 ## 背景
 
-P0 durable Session runtime core 已完成本地核心闭环。第二阶段 / P1 已补齐 async job/timer 语义和 InMemory 实现；PR-0010 package/release hygiene 因 Owner license 决策延后而继续延后。
+P0 durable Session runtime core 已完成本地核心闭环。第二阶段 / P1 已补齐 package/release hygiene、async job/timer 语义和 InMemory 实现。
 
 当前需要在三个候选方向之间选择下一组可 review 切片：
 
@@ -66,4 +66,4 @@ P0 durable Session runtime core 已完成本地核心闭环。第二阶段 / P1 
 
 ## 当前推荐下一步
 
-PR-0010 license/package 决策继续挂起。Safety/Auth ADR、首个 InMemory capability policy gate 和 approval flow ADR 已完成；后续不要直接实现未排队能力，建议基于 ADR-0008 拆 ApprovalRequest store / approval result flow 的本地确定性实现切片。
+Safety/Auth ADR、首个 InMemory capability policy gate 和 approval flow ADR 已完成；后续不要直接实现未排队能力，建议基于 ADR-0008 拆 ApprovalRequest store / approval result flow 的本地确定性实现切片。

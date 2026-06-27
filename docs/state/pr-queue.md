@@ -1,7 +1,7 @@
 # 产品 PR 队列
 
 > 状态: 当前
-> 最近更新: 2026-06-23
+> 最近更新: 2026-06-27
 
 本文件是可独立 review 的产品工作的权威队列。每个 PR 都应足够小，可以作为一个连贯变更被 review 和测试。
 
@@ -20,7 +20,7 @@
 | PR-0007 | 已完成 | P0 收尾审查与后续立项整理 | `docs/tasks/T-0009-p0-closeout-review.md` | 审查 PR-0002 到 PR-0006 的实现、测试、ADR 和状态一致性 | `make check`、basic example、compileall |
 | PR-0008 | 已完成 | 增加 checkpoint recovery example/test | `docs/tasks/T-0010-checkpoint-recovery-example.md` | 从 latest Checkpoint 加载并恢复 Session 边界 | checkpoint recovery deterministic test 和 example smoke test |
 | PR-0009 | 已完成 | 规划第二阶段 | `docs/tasks/T-0011-phase-two-planning.md` | 固化第二阶段目标、非目标、成功标准和后续 PR 切片 | 文档 diff review；`make check` |
-| PR-0010 | 延后 | package/release hygiene | `docs/tasks/T-0012-package-release-hygiene.md` | 最小 Python package 元数据、安装说明、import smoke test；license 依赖 Owner 决策 | `make check`、import smoke、example smoke |
+| PR-0010 | 已完成 | package/release hygiene | `docs/tasks/T-0012-package-release-hygiene.md` | 最小 Python package 元数据、安装说明、import smoke test；license 使用 Apache-2.0 | `make check`、import smoke、example smoke |
 | PR-0011 | 已完成 | ADR 定义 async job/timer 语义 | `docs/tasks/T-0013-async-job-timer-adr.md` | Signal/Event/Decision/Checkpoint/store 边界；不实现 runtime | ADR review |
 | PR-0012 | 已完成 | InMemory timer flow | `docs/tasks/T-0014-inmemory-timer-flow.md` | 本地 timer store、due 查询、timer Signal 唤醒 Session | deterministic timer tests；`make check` |
 | PR-0013 | 已完成 | InMemory async job flow | `docs/tasks/T-0015-inmemory-async-job-flow.md` | 本地 job lifecycle、job result Signal 回灌 Session | deterministic job tests；`make check` |
@@ -108,6 +108,16 @@
 
 - Owner 已明确 license 决策先延后，因此 PR-0010 package/release hygiene 随 ACT-0002 延后。
 - 延后期间不能声称仓库已具备完整开源发布卫生。
+
+## PR-0010 完成记录
+
+- Owner 已确认 license 使用 Apache-2.0。
+- 新增根目录 `LICENSE`。
+- 新增最小 `pyproject.toml`，声明 package metadata、Python 3.12 下限、Apache-2.0 license 和 `src/` package discovery。
+- README 新增本地 editable install、测试、example 和 license 说明。
+- 新增 import smoke test 覆盖 `sessgraph` public package import。
+- `.gitignore` 新增本地 venv、build、dist 和 egg-info 产物。
+- 未发布到 PyPI，未新增 CI，未引入 runtime 依赖，未修改 runtime 语义。
 
 ## PR-0011 完成记录
 

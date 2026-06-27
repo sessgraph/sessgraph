@@ -1,8 +1,8 @@
 # T-0012: package/release hygiene
 
-> 状态: 延后
+> 状态: 已完成
 > PR: PR-0010
-> 最近更新: 2026-06-20
+> 最近更新: 2026-06-27
 
 ## 目标
 
@@ -28,10 +28,20 @@
 
 ## 依赖
 
-- ACT-0002：Owner 已明确延后 license 决策；本任务随 license 决策延后。
+- ACT-0002：Owner 已确认使用 Apache-2.0。
 
 ## 验证
 
 - `make check`。
 - 本地 import smoke test。
 - example smoke test。
+
+## 完成记录
+
+- Owner 已确认 license 使用 Apache-2.0。
+- 新增根目录 `LICENSE`。
+- 新增最小 `pyproject.toml`，声明 package metadata、Python 3.12 下限和 Apache-2.0 license。
+- 新增 import smoke test，覆盖 `sessgraph` public package import。
+- README 新增本地 editable install、测试、example 和 license 说明。
+- `.gitignore` 新增本地 venv、build、dist 和 egg-info 产物。
+- 未发布到 PyPI，未新增 CI，未引入 runtime 依赖，未修改 runtime 语义。
