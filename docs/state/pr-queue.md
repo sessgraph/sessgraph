@@ -32,6 +32,7 @@
 | PR-0019 | 已完成 | InMemory capability policy gate | `docs/tasks/T-0021-inmemory-capability-policy-gate.md` | 本地 AuthContext、CapabilityGrant 和 tool/job authorization gate | auth deterministic tests；runner integration tests；`make check` |
 | PR-0020 | 已完成 | ADR 定义 approval flow 语义 | `docs/tasks/T-0022-approval-flow-adr.md` | ApprovalRequest、approval_result Signal、approval Event/Checkpoint 边界；不实现 runtime | ADR review；`make check` |
 | PR-0021 | 已完成 | InMemory ApprovalRequest store | `docs/tasks/T-0023-inmemory-approval-request-store.md` | ApprovalRequest record、deterministic id、InMemory store；不实现 runner flow | approval store tests；`make check` |
+| PR-0022 | 已完成 | Approval-required runner flow | `docs/tasks/T-0024-approval-required-runner-flow.md` | policy outcome 创建 ApprovalRequest、追加 `approval_requested` Event、Checkpoint 并暂停 action；不处理 `approval_result` | approval-required runner tests；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -223,6 +224,15 @@
 - 新增 public package exports。
 - 新增 deterministic approval model/store tests。
 - 未实现 Activation Runner approval-required 分支、`approval_result` Signal dispatch、approval Event 或 Checkpoint 保存。
+
+## PR-0022 完成记录
+
+- `PolicyDecision` 新增 `requires_approval` outcome 标志，hard deny 行为保持 `authorization_denied` 不变。
+- `InMemoryPolicyGate` 可通过 CapabilityGrant `constraints.requires_approval=true` 返回 approval-required outcome。
+- `ActivationRunner` 对 approval-required 的 `tool_call` / `submit_job` 创建 `ApprovalRequest`、追加 `approval_requested` Event、保存 Checkpoint，并将 Session 置为 `waiting`。
+- approval-required 时不会执行 tool，也不会创建 job。
+- 新增 deterministic policy/runner tests；`make check` 通过。
+- 未实现 `approval_result` Signal dispatch、approved dispatch、denied skip、duplicate result idempotency 或 stale result ignored。
 
 ## 队列纪律
 

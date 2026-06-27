@@ -281,6 +281,24 @@ class InMemoryPolicyGateTests(unittest.TestCase):
         self.assertFalse(unauthenticated.allowed)
         self.assertEqual(unauthenticated.reason, "unauthenticated")
 
+    def test_policy_gate_can_require_approval_for_matching_grant(self) -> None:
+        store = InMemoryCapabilityGrantStore()
+        store.save(_grant(constraints={"requires_approval": True}))
+        gate = InMemoryPolicyGate(grant_store=store, clock=lambda: NOW)
+
+        decision = gate.authorize(
+            session=_session(),
+            auth_context=_auth_context(),
+            action_kind="tool_call",
+            resource={"tool_name": "uppercase"},
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertTrue(decision.requires_approval)
+        self.assertEqual(decision.reason, "approval_required")
+        self.assertEqual(decision.grant_id, "grant-1")
+        self.assertEqual(PolicyDecision.from_dict(decision.to_dict()), decision)
+
 
 class ActivationRunnerPolicyGateTests(unittest.TestCase):
     def test_tool_call_denial_records_event_and_skips_tool_execution(self) -> None:
@@ -326,6 +344,52 @@ class ActivationRunnerPolicyGateTests(unittest.TestCase):
         ])
         self.assertEqual(result.checkpoint.state["policy_decision"]["grant_id"], "grant-1")
 
+    def test_tool_call_approval_required_creates_request_and_pauses_action(self) -> None:
+        fixture = _runner_fixture(
+            model=FakeModel(
+                kind=DecisionKind.TOOL_CALL,
+                tool_name="uppercase",
+                tool_arguments={"text": "hello"},
+            )
+        )
+        fixture.grant_store.save(_grant(constraints={"requires_approval": True}))
+
+        result = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+
+        self.assertFalse(result.policy_decision.allowed)
+        self.assertTrue(result.policy_decision.requires_approval)
+        self.assertIsNotNone(result.approval_request)
+        self.assertEqual(result.approval_request.status, ApprovalStatus.PENDING)
+        self.assertEqual(result.session.status, SessionStatus.WAITING)
+        self.assertIsNone(result.tool_result)
+        self.assertEqual(fixture.tool_calls, [])
+        self.assertEqual(
+            fixture.approval_store.list_pending_for_session("sess-1"),
+            (result.approval_request,),
+        )
+        self.assertEqual([event.event_type for event in result.events], [
+            "signal_received",
+            "decision_produced",
+            "approval_requested",
+        ])
+        approval_event = result.events[-1]
+        self.assertEqual(approval_event.payload["approval_id"], result.approval_request.approval_id)
+        self.assertEqual(approval_event.payload["action_kind"], "tool_call")
+        self.assertEqual(approval_event.payload["resource"]["tool_name"], "uppercase")
+        self.assertTrue(approval_event.payload["policy"]["requires_approval"])
+        self.assertEqual(result.checkpoint.state["policy_decision"]["requires_approval"], True)
+        self.assertEqual(
+            result.checkpoint.state["approval_request"]["approval_id"],
+            result.approval_request.approval_id,
+        )
+        self.assertEqual(
+            result.checkpoint.state["approval_request"]["action_payload"]["decision"][
+                "decision_id"
+            ],
+            result.decision.decision_id,
+        )
+        self.assertEqual(fixture.inbox_store.list_for_session("sess-1"), ())
+
     def test_submit_job_denial_skips_job_creation(self) -> None:
         fixture = _runner_fixture(
             model=FakeModel(kind=DecisionKind.SUBMIT_JOB, job_type="export"),
@@ -340,12 +404,36 @@ class ActivationRunnerPolicyGateTests(unittest.TestCase):
         self.assertEqual(result.events[-1].event_type, "authorization_denied")
         self.assertEqual(result.events[-1].payload["resource"]["job_type"], "export")
 
+    def test_submit_job_approval_required_skips_job_creation(self) -> None:
+        fixture = _runner_fixture(
+            model=FakeModel(kind=DecisionKind.SUBMIT_JOB, job_type="export"),
+            include_job_store=True,
+        )
+        fixture.grant_store.save(
+            _grant(
+                action_kind="submit_job",
+                resource={"job_type": "export"},
+                constraints={"requires_approval": True},
+            )
+        )
+
+        result = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+
+        self.assertTrue(result.policy_decision.requires_approval)
+        self.assertIsNotNone(result.approval_request)
+        self.assertEqual(result.approval_request.action_kind, "submit_job")
+        self.assertIsNone(result.job)
+        self.assertEqual(fixture.job_store.list_for_session("sess-1"), ())
+        self.assertEqual(result.events[-1].event_type, "approval_requested")
+        self.assertEqual(result.events[-1].payload["resource"]["job_type"], "export")
+
 
 @dataclass
 class RunnerFixture:
     runner: ActivationRunner
     inbox_store: InMemoryInboxStore
     grant_store: InMemoryCapabilityGrantStore
+    approval_store: InMemoryApprovalRequestStore
     job_store: InMemoryJobStore
     tool_calls: list[dict[str, object]]
 
@@ -377,6 +465,7 @@ def _runner_fixture(
     event_store = InMemoryEventStore()
     checkpoint_store = InMemoryCheckpointStore()
     grant_store = InMemoryCapabilityGrantStore()
+    approval_store = InMemoryApprovalRequestStore()
     job_store = InMemoryJobStore()
     tool_calls: list[dict[str, object]] = []
 
@@ -411,12 +500,14 @@ def _runner_fixture(
         tool_executor=SyncToolExecutor(registry),
         job_store=job_store if include_job_store else None,
         policy_gate=InMemoryPolicyGate(grant_store=grant_store, clock=clock),
+        approval_store=approval_store,
         clock=clock,
     )
     return RunnerFixture(
         runner=runner,
         inbox_store=inbox_store,
         grant_store=grant_store,
+        approval_store=approval_store,
         job_store=job_store,
         tool_calls=tool_calls,
     )
@@ -447,17 +538,21 @@ def _auth_context(
 def _grant(
     *,
     grant_id: str = "grant-1",
+    action_kind: str = "tool_call",
     resource: dict[str, object] | None = None,
     constraints: dict[str, object] | None = None,
     idempotency_key: str | None = None,
 ) -> CapabilityGrant:
+    default_resource = (
+        {"job_type": "export"} if action_kind == "submit_job" else {"tool_name": "uppercase"}
+    )
     return CapabilityGrant(
         grant_id=grant_id,
         session_id="sess-1",
         agent_id="agent-1",
         subject="user:user-1",
-        action_kind="tool_call",
-        resource=resource or {"tool_name": "uppercase"},
+        action_kind=action_kind,
+        resource=resource or default_resource,
         constraints=constraints or {},
         created_at=NOW,
         idempotency_key=idempotency_key,

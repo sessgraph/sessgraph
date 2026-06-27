@@ -7,7 +7,14 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Protocol
 
-from sessgraph.auth import AuthContext, InMemoryPolicyGate, PolicyDecision
+from sessgraph.auth import (
+    ApprovalRequest,
+    AuthContext,
+    InMemoryApprovalRequestStore,
+    InMemoryPolicyGate,
+    PolicyDecision,
+    approval_request_id,
+)
 from sessgraph.context import ContextBuilder, ContextSnapshot
 from sessgraph.core import (
     AgentDefinition,
@@ -70,6 +77,7 @@ class ActivationResult:
     job: JobRecord | None = None
     context_snapshot: ContextSnapshot | None = None
     policy_decision: PolicyDecision | None = None
+    approval_request: ApprovalRequest | None = None
 
 
 @dataclass(slots=True)
@@ -86,6 +94,7 @@ class ActivationRunner:
     job_store: InMemoryJobStore | None = None
     context_builder: ContextBuilder | None = None
     policy_gate: InMemoryPolicyGate | None = None
+    approval_store: InMemoryApprovalRequestStore | None = None
     clock: Callable[[], datetime] = field(default_factory=lambda: _utcnow)
 
     def run_once(
@@ -130,11 +139,31 @@ class ActivationRunner:
             decision=decision,
             auth_context=auth_context,
         )
-        denied = policy_decision is not None and not policy_decision.allowed
-        tool_result = None if denied else self._execute_tool_call(decision)
-        job = None if denied else self._submit_job(decision)
+        approval_required = (
+            policy_decision is not None and policy_decision.requires_approval
+        )
+        denied = (
+            policy_decision is not None
+            and not policy_decision.allowed
+            and not policy_decision.requires_approval
+        )
+        dispatch_allowed = policy_decision is None or policy_decision.allowed
+        approval_request = (
+            self._new_approval_request(
+                session=running,
+                signal=signal,
+                decision=decision,
+                policy_decision=policy_decision,
+            )
+            if approval_required and policy_decision is not None
+            else None
+        )
+        tool_result = self._execute_tool_call(decision) if dispatch_allowed else None
+        job = self._submit_job(decision) if dispatch_allowed else None
 
         running = self.session_store.update(running, expected_revision=session.revision)
+        if approval_request is not None:
+            approval_request = self._save_approval_request(approval_request)
         signal_event = self._append_event(
             session_id=session_id,
             event_type="signal_received",
@@ -162,6 +191,15 @@ class ActivationRunner:
                 source_signal_id=signal.signal_id,
             )
             events.append(authorization_event)
+
+        if approval_request is not None and policy_decision is not None:
+            approval_event = self._append_event(
+                session_id=session_id,
+                event_type="approval_requested",
+                payload=_approval_requested_payload(approval_request, policy_decision),
+                source_signal_id=signal.signal_id,
+            )
+            events.append(approval_event)
 
         if tool_result is not None:
             tool_call_event = self._append_event(
@@ -195,7 +233,12 @@ class ActivationRunner:
             )
             events.append(job_event)
 
-        final_status = SessionStatus.IDLE if denied else _status_for_decision(decision)
+        if denied:
+            final_status = SessionStatus.IDLE
+        elif approval_request is not None:
+            final_status = SessionStatus.WAITING
+        else:
+            final_status = _status_for_decision(decision)
         checkpoint_id = _checkpoint_id(session_id, running.revision + 1, events[-1].sequence)
         final_session = replace(
             running,
@@ -215,6 +258,7 @@ class ActivationRunner:
             job=job,
             context_snapshot=context_snapshot,
             policy_decision=policy_decision,
+            approval_request=approval_request,
         )
         if tool_result is not None:
             self.inbox_store.enqueue(
@@ -246,6 +290,7 @@ class ActivationRunner:
             job=job,
             context_snapshot=context_snapshot,
             policy_decision=policy_decision,
+            approval_request=approval_request,
         )
 
     def _append_event(
@@ -280,6 +325,7 @@ class ActivationRunner:
         job: JobRecord | None,
         context_snapshot: ContextSnapshot | None,
         policy_decision: PolicyDecision | None,
+        approval_request: ApprovalRequest | None,
     ) -> Checkpoint:
         state: JsonObject = {
             "session": session.to_dict(),
@@ -291,6 +337,8 @@ class ActivationRunner:
             state["context_snapshot"] = _context_snapshot_metadata(context_snapshot)
         if policy_decision is not None:
             state["policy_decision"] = policy_decision.to_dict()
+        if approval_request is not None:
+            state["approval_request"] = approval_request.to_dict()
         if tool_result is not None:
             state["tool_result"] = tool_result.to_dict()
         if job is not None:
@@ -330,6 +378,53 @@ class ActivationRunner:
             action_kind=action_kind,
             resource=resource,
         )
+
+    def _new_approval_request(
+        self,
+        *,
+        session: Session,
+        signal: Signal,
+        decision: Decision,
+        policy_decision: PolicyDecision,
+    ) -> ApprovalRequest:
+        if self.approval_store is None:
+            raise DecisionRejectedError(
+                "approval_store is required for approval-required decisions"
+            )
+        idempotency_key = f"approval:{signal.signal_id}:{decision.decision_id}"
+        approval = ApprovalRequest(
+            approval_id=approval_request_id(
+                session_id=session.session_id,
+                decision_id=decision.decision_id,
+                action_kind=policy_decision.action_kind,
+                resource=policy_decision.resource,
+                idempotency_key=idempotency_key,
+            ),
+            session_id=session.session_id,
+            decision_id=decision.decision_id,
+            signal_id=signal.signal_id,
+            action_kind=policy_decision.action_kind,
+            resource=policy_decision.resource,
+            action_payload={
+                "decision": decision.to_dict(),
+                "source_signal": {
+                    "signal_id": signal.signal_id,
+                    "signal_type": signal.signal_type,
+                },
+            },
+            requesting_actor=policy_decision.actor,
+            created_at=self._now(),
+            reason=policy_decision.reason,
+            idempotency_key=idempotency_key,
+        )
+        return approval
+
+    def _save_approval_request(self, approval_request: ApprovalRequest) -> ApprovalRequest:
+        if self.approval_store is None:
+            raise DecisionRejectedError(
+                "approval_store is required for approval-required decisions"
+            )
+        return self.approval_store.create(approval_request)
 
     def _validate_decision(self, decision: Decision, session_id: str) -> None:
         if decision.session_id != session_id:
@@ -437,6 +532,28 @@ def _policy_denial_payload(
             "allowed": policy_decision.allowed,
         },
         "reason": policy_decision.reason,
+    }
+
+
+def _approval_requested_payload(
+    approval_request: ApprovalRequest,
+    policy_decision: PolicyDecision,
+) -> JsonObject:
+    policy_data = policy_decision.to_dict()
+    return {
+        "approval_id": approval_request.approval_id,
+        "decision_id": approval_request.decision_id,
+        "signal_id": approval_request.signal_id,
+        "action_kind": approval_request.action_kind,
+        "resource": approval_request.to_dict()["resource"],
+        "requesting_actor": approval_request.to_dict()["requesting_actor"],
+        "policy": {
+            "policy_id": policy_decision.policy_id,
+            "grant_id": policy_decision.grant_id,
+            "allowed": policy_decision.allowed,
+            "requires_approval": policy_decision.requires_approval,
+        },
+        "reason": policy_data["reason"],
     }
 
 

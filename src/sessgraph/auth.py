@@ -184,10 +184,15 @@ class PolicyDecision:
     decided_at: datetime
     grant_id: str | None = None
     policy_id: str = POLICY_ID
+    requires_approval: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.allowed, bool):
             raise ValidationError("allowed must be a boolean")
+        if not isinstance(self.requires_approval, bool):
+            raise ValidationError("requires_approval must be a boolean")
+        if self.allowed and self.requires_approval:
+            raise ValidationError("allowed decisions cannot require approval")
         _require_non_empty("action_kind", self.action_kind)
         _require_non_empty("reason", self.reason)
         _require_datetime("decided_at", self.decided_at)
@@ -207,6 +212,7 @@ class PolicyDecision:
             "actor": _copy_json_object("actor", self.actor),
             "grant_id": self.grant_id,
             "policy_id": self.policy_id,
+            "requires_approval": self.requires_approval,
             "decided_at": _datetime_to_json(self.decided_at),
         }
 
@@ -221,6 +227,7 @@ class PolicyDecision:
             actor=_copy_json_object("actor", _require_field(data, "actor")),
             grant_id=data.get("grant_id"),
             policy_id=_require_field(data, "policy_id"),
+            requires_approval=data.get("requires_approval", False),
             decided_at=_datetime_from_json(_require_field(data, "decided_at"), "decided_at"),
         )
 
@@ -553,6 +560,18 @@ class InMemoryPolicyGate:
                 action_kind=action_kind,
                 resource=checked_resource,
             ):
+                if _grant_requires_approval(grant.constraints):
+                    return PolicyDecision(
+                        allowed=False,
+                        action_kind=action_kind,
+                        resource=checked_resource,
+                        reason="approval_required",
+                        actor=_actor_metadata(auth_context),
+                        grant_id=grant.grant_id,
+                        policy_id=self.policy_id,
+                        requires_approval=True,
+                        decided_at=now,
+                    )
                 return PolicyDecision(
                     allowed=True,
                     action_kind=action_kind,
@@ -673,6 +692,13 @@ def _constraints_match(constraints: JsonObject, auth_context: AuthContext) -> bo
         return True
     required = set(_coerce_string_tuple("constraints.required_scopes", required_scopes))
     return required.issubset(set(auth_context.scopes))
+
+
+def _grant_requires_approval(constraints: JsonObject) -> bool:
+    value = constraints.get("requires_approval", False)
+    if not isinstance(value, bool):
+        raise ValidationError("constraints.requires_approval must be a boolean")
+    return value
 
 
 def _actor_metadata(auth_context: AuthContext) -> JsonObject:
