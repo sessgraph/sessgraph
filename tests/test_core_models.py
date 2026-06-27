@@ -209,6 +209,45 @@ class CoreModelTests(unittest.TestCase):
                     created_at=NOW,
                 )
 
+    def test_decision_round_trips_and_validates_start_child_session(self) -> None:
+        decision = Decision(
+            decision_id="dec-child-1",
+            session_id="sess-1",
+            kind="start_child_session",
+            payload={
+                "child_agent_id": "child-agent",
+                "input": {"task": "review"},
+                "metadata": {"priority": "high"},
+                "context_policy": {"max_events": 3},
+                "idempotency_key": "child-request-1",
+            },
+            created_at=NOW,
+        )
+
+        restored = Decision.from_dict(decision.to_dict())
+
+        self.assertEqual(restored, decision)
+        self.assertEqual(restored.kind, DecisionKind.START_CHILD_SESSION)
+
+        invalid_payloads = (
+            {},
+            {"child_agent_id": "", "input": {}},
+            {"child_agent_id": "child-agent"},
+            {"child_agent_id": "child-agent", "input": []},
+            {"child_agent_id": "child-agent", "input": {}, "metadata": []},
+            {"child_agent_id": "child-agent", "input": {}, "context_policy": []},
+            {"child_agent_id": "child-agent", "input": {}, "idempotency_key": ""},
+        )
+        for payload in invalid_payloads:
+            with self.assertRaises(ValidationError):
+                Decision(
+                    decision_id="dec-child-invalid",
+                    session_id="sess-1",
+                    kind=DecisionKind.START_CHILD_SESSION,
+                    payload=payload,
+                    created_at=NOW,
+                )
+
     def test_checkpoint_round_trips(self) -> None:
         checkpoint = Checkpoint(
             checkpoint_id="chk-1",

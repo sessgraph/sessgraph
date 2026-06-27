@@ -1,6 +1,6 @@
 # T-0028: InMemory child session creation flow
 
-> 状态: 待开始
+> 状态: 已完成
 > PR: PR-0026
 > 最近更新: 2026-06-27
 
@@ -38,3 +38,13 @@
 - `make check`。
 - 新增 child session creation 单元测试和 runner 集成测试。
 - 不发起真实网络调用或真实 LLM 调用。
+
+## 完成记录
+
+- 新增 `DecisionKind.START_CHILD_SESSION` 及 payload 校验。
+- 新增 `ChildSessionRecord`、`ChildSessionStatus`、deterministic `child_session_id_for_decision` 和 `InMemoryChildSessionStore`。
+- `ActivationRunner` 支持创建 Child Session、enqueue `child_start` Signal，并在 Parent Event Log 追加 `child_session_started`。
+- Parent Checkpoint state 记录 `child_session_record`、created Child Session 和 `child_start` Signal。
+- `start_child_session` 接入现有 Safety/Auth policy gate，覆盖 hard deny、approval-required pause 和 approved dispatch。
+- 新增 deterministic tests 覆盖 child record/store、runtime creation、authorization denial、grant allow、approval-required、approved dispatch、Event append-only 和 Checkpoint state。
+- 未实现 `child_result` Signal dispatcher、Parent reducer merge、shared memory、capability delegation、真实 queue、database、server、provider 或 cloud。

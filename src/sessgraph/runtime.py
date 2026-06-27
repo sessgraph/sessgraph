@@ -16,6 +16,11 @@ from sessgraph.auth import (
     PolicyDecision,
     approval_request_id,
 )
+from sessgraph.children import (
+    ChildSessionRecord,
+    InMemoryChildSessionStore,
+    child_session_id_for_decision,
+)
 from sessgraph.context import ContextBuilder, ContextSnapshot
 from sessgraph.core import (
     AgentDefinition,
@@ -77,6 +82,9 @@ class ActivationResult:
     checkpoint: Checkpoint | None = None
     tool_result: ToolResult | None = None
     job: JobRecord | None = None
+    child_session_record: ChildSessionRecord | None = None
+    child_session: Session | None = None
+    child_start_signal: Signal | None = None
     context_snapshot: ContextSnapshot | None = None
     policy_decision: PolicyDecision | None = None
     approval_request: ApprovalRequest | None = None
@@ -103,6 +111,7 @@ class ActivationRunner:
     checkpoint_store: InMemoryCheckpointStore
     tool_executor: SyncToolExecutor | None = None
     job_store: InMemoryJobStore | None = None
+    child_session_store: InMemoryChildSessionStore | None = None
     context_builder: ContextBuilder | None = None
     policy_gate: InMemoryPolicyGate | None = None
     approval_store: InMemoryApprovalRequestStore | None = None
@@ -178,6 +187,15 @@ class ActivationRunner:
         )
         tool_result = self._execute_tool_call(decision) if dispatch_allowed else None
         job = self._submit_job(decision) if dispatch_allowed else None
+        child_session_record, child_session, child_start_signal = (
+            self._start_child_session(
+                decision,
+                parent_session=running,
+                parent_signal_id=signal.signal_id,
+            )
+            if dispatch_allowed
+            else (None, None, None)
+        )
 
         running = self.session_store.update(running, expected_revision=session.revision)
         if approval_request is not None:
@@ -251,6 +269,15 @@ class ActivationRunner:
             )
             events.append(job_event)
 
+        if child_session_record is not None:
+            child_event = self._append_event(
+                session_id=session_id,
+                event_type="child_session_started",
+                payload=_child_session_started_payload(child_session_record),
+                source_signal_id=signal.signal_id,
+            )
+            events.append(child_event)
+
         if denied:
             final_status = SessionStatus.IDLE
         elif approval_request is not None:
@@ -274,6 +301,9 @@ class ActivationRunner:
             events=tuple(events),
             tool_result=tool_result,
             job=job,
+            child_session_record=child_session_record,
+            child_session=child_session,
+            child_start_signal=child_start_signal,
             context_snapshot=context_snapshot,
             policy_decision=policy_decision,
             approval_request=approval_request,
@@ -306,6 +336,9 @@ class ActivationRunner:
             checkpoint=checkpoint,
             tool_result=tool_result,
             job=job,
+            child_session_record=child_session_record,
+            child_session=child_session,
+            child_start_signal=child_start_signal,
             context_snapshot=context_snapshot,
             policy_decision=policy_decision,
             approval_request=approval_request,
@@ -341,6 +374,9 @@ class ActivationRunner:
         events: tuple[Event, ...],
         tool_result: ToolResult | None,
         job: JobRecord | None,
+        child_session_record: ChildSessionRecord | None,
+        child_session: Session | None,
+        child_start_signal: Signal | None,
         context_snapshot: ContextSnapshot | None,
         policy_decision: PolicyDecision | None,
         approval_request: ApprovalRequest | None,
@@ -368,6 +404,12 @@ class ActivationRunner:
             state["tool_result"] = tool_result.to_dict()
         if job is not None:
             state["job"] = job.to_dict()
+        if child_session_record is not None:
+            state["child_session_record"] = child_session_record.to_dict()
+        if child_session is not None:
+            state["created_child_session"] = child_session.to_dict()
+        if child_start_signal is not None:
+            state["child_start_signal"] = child_start_signal.to_dict()
 
         checkpoint = Checkpoint(
             checkpoint_id=checkpoint_id,
@@ -422,6 +464,9 @@ class ActivationRunner:
         resolved_approval: ApprovalRequest | None = None
         tool_result: ToolResult | None = None
         job: JobRecord | None = None
+        child_session_record: ChildSessionRecord | None = None
+        child_session: Session | None = None
+        child_start_signal: Signal | None = None
 
         if approval_request is None:
             ignored_payload = _approval_result_ignored_payload(
@@ -496,6 +541,13 @@ class ActivationRunner:
                     raise DecisionRejectedError("approved approval result has no action decision")
                 tool_result = self._execute_tool_call(decision)
                 job = self._submit_job(decision)
+                child_session_record, child_session, child_start_signal = (
+                    self._start_child_session(
+                        decision,
+                        parent_session=running,
+                        parent_signal_id=approval_request.signal_id,
+                    )
+                )
 
                 if tool_result is not None:
                     tool_call_event = self._append_event(
@@ -532,6 +584,15 @@ class ActivationRunner:
                     )
                     events.append(job_event)
 
+                if child_session_record is not None:
+                    child_event = self._append_event(
+                        session_id=session.session_id,
+                        event_type="child_session_started",
+                        payload=_child_session_started_payload(child_session_record),
+                        source_signal_id=signal.signal_id,
+                    )
+                    events.append(child_event)
+
                 final_status = _status_for_decision(decision)
             else:
                 final_status = SessionStatus.IDLE
@@ -553,6 +614,9 @@ class ActivationRunner:
             events=tuple(events),
             tool_result=tool_result,
             job=job,
+            child_session_record=child_session_record,
+            child_session=child_session,
+            child_start_signal=child_start_signal,
             context_snapshot=None,
             policy_decision=None,
             approval_request=resolved_approval or approval_request,
@@ -587,6 +651,9 @@ class ActivationRunner:
             checkpoint=checkpoint,
             tool_result=tool_result,
             job=job,
+            child_session_record=child_session_record,
+            child_session=child_session,
+            child_start_signal=child_start_signal,
             context_snapshot=None,
             policy_decision=None,
             approval_request=resolved_approval or approval_request,
@@ -644,6 +711,13 @@ class ActivationRunner:
             raise DecisionRejectedError("tool_executor is required for approved tool_call")
         if decision.kind is DecisionKind.SUBMIT_JOB and self.job_store is None:
             raise DecisionRejectedError("job_store is required for approved submit_job")
+        if (
+            decision.kind is DecisionKind.START_CHILD_SESSION
+            and self.child_session_store is None
+        ):
+            raise DecisionRejectedError(
+                "child_session_store is required for approved start_child_session"
+            )
 
     def _validate_decision(self, decision: Decision, session_id: str) -> None:
         if decision.session_id != session_id:
@@ -656,6 +730,7 @@ class ActivationRunner:
             DecisionKind.TOOL_CALL,
             DecisionKind.ASK_USER,
             DecisionKind.SUBMIT_JOB,
+            DecisionKind.START_CHILD_SESSION,
         }
         if decision.kind not in supported_kinds:
             raise DecisionRejectedError(f"unsupported decision kind: {decision.kind.value}")
@@ -687,6 +762,74 @@ class ActivationRunner:
             )
         )
 
+    def _start_child_session(
+        self,
+        decision: Decision,
+        *,
+        parent_session: Session,
+        parent_signal_id: str,
+    ) -> tuple[ChildSessionRecord | None, Session | None, Signal | None]:
+        if decision.kind is not DecisionKind.START_CHILD_SESSION:
+            return None, None, None
+        if self.child_session_store is None:
+            raise DecisionRejectedError(
+                "child_session_store is required for start_child_session decisions"
+            )
+
+        child_agent_id = str(decision.payload["child_agent_id"])
+        idempotency_key = _optional_payload_string(decision, "idempotency_key")
+        child = self.child_session_store.start(
+            ChildSessionRecord(
+                child_session_id=child_session_id_for_decision(
+                    parent_session_id=parent_session.session_id,
+                    parent_decision_id=decision.decision_id,
+                    child_agent_id=child_agent_id,
+                    idempotency_key=idempotency_key,
+                ),
+                parent_session_id=parent_session.session_id,
+                parent_decision_id=decision.decision_id,
+                parent_signal_id=parent_signal_id,
+                child_agent_id=child_agent_id,
+                input=decision.payload["input"],
+                metadata=_optional_decision_payload_object(decision, "metadata"),
+                context_policy=_optional_decision_payload_object(decision, "context_policy"),
+                created_at=decision.created_at,
+                idempotency_key=idempotency_key,
+            )
+        )
+        child_session = self._create_or_get_child_session(child)
+        child_start_signal = self.inbox_store.enqueue(
+            Signal(
+                signal_id=_child_start_signal_id(child),
+                session_id=child.child_session_id,
+                signal_type="child_start",
+                payload=_child_start_payload(child),
+                created_at=child.created_at,
+                idempotency_key=f"child_start:{child.child_session_id}",
+            )
+        )
+        return child, child_session, child_start_signal
+
+    def _create_or_get_child_session(self, child: ChildSessionRecord) -> Session:
+        existing = self.session_store.get(child.child_session_id)
+        if existing is not None:
+            if existing.agent_id != child.child_agent_id:
+                raise DecisionRejectedError("existing child session agent_id mismatch")
+            return existing
+        return self.session_store.create(
+            Session(
+                session_id=child.child_session_id,
+                agent_id=child.child_agent_id,
+                status=SessionStatus.IDLE,
+                created_at=child.created_at,
+                updated_at=child.created_at,
+                metadata={
+                    "parent_session_id": child.parent_session_id,
+                    "parent_decision_id": child.parent_decision_id,
+                },
+            )
+        )
+
     def _now(self) -> datetime:
         current = self.clock()
         if current.tzinfo is None or current.utcoffset() is None:
@@ -705,6 +848,8 @@ def _status_for_decision(decision: Decision) -> SessionStatus:
         return SessionStatus.WAITING
     if decision.kind is DecisionKind.SUBMIT_JOB:
         return SessionStatus.IDLE
+    if decision.kind is DecisionKind.START_CHILD_SESSION:
+        return SessionStatus.IDLE
     raise DecisionRejectedError(f"unsupported decision kind: {decision.kind.value}")
 
 
@@ -720,6 +865,10 @@ def _tool_result_signal_id(session_id: str, decision_id: str) -> str:
     return f"{session_id}:signal:tool_result:{decision_id}"
 
 
+def _child_start_signal_id(child: ChildSessionRecord) -> str:
+    return f"{child.child_session_id}:signal:child_start:{child.parent_decision_id}"
+
+
 def _optional_payload_string(decision: Decision, field_name: str) -> str | None:
     value = decision.payload.get(field_name)
     if value is None:
@@ -727,11 +876,22 @@ def _optional_payload_string(decision: Decision, field_name: str) -> str | None:
     return str(value)
 
 
+def _optional_decision_payload_object(decision: Decision, field_name: str) -> JsonObject:
+    value = decision.payload.get(field_name, {})
+    if not isinstance(value, Mapping):
+        raise DecisionRejectedError(f"payload.{field_name} must be a JSON object")
+    return value
+
+
 def _policy_action_for_decision(decision: Decision) -> tuple[str, JsonObject] | None:
     if decision.kind is DecisionKind.TOOL_CALL:
         return decision.kind.value, {"tool_name": str(decision.payload["tool_name"])}
     if decision.kind is DecisionKind.SUBMIT_JOB:
         return decision.kind.value, {"job_type": str(decision.payload["job_type"])}
+    if decision.kind is DecisionKind.START_CHILD_SESSION:
+        return decision.kind.value, {
+            "child_agent_id": str(decision.payload["child_agent_id"])
+        }
     return None
 
 
@@ -801,11 +961,38 @@ def _decision_from_approval_request(approval_request: ApprovalRequest) -> Decisi
         raise DecisionRejectedError("approval decision_id does not match request")
     if decision.kind.value != approval_request.action_kind:
         raise DecisionRejectedError("approval decision kind does not match action_kind")
-    if decision.kind not in {DecisionKind.TOOL_CALL, DecisionKind.SUBMIT_JOB}:
+    if decision.kind not in {
+        DecisionKind.TOOL_CALL,
+        DecisionKind.SUBMIT_JOB,
+        DecisionKind.START_CHILD_SESSION,
+    }:
         raise DecisionRejectedError(
             f"unsupported approval action kind: {decision.kind.value}"
         )
     return decision
+
+
+def _child_session_started_payload(child: ChildSessionRecord) -> JsonObject:
+    return {
+        "child_session_id": child.child_session_id,
+        "parent_decision_id": child.parent_decision_id,
+        "parent_signal_id": child.parent_signal_id,
+        "child_agent_id": child.child_agent_id,
+        "idempotency_key": child.idempotency_key,
+    }
+
+
+def _child_start_payload(child: ChildSessionRecord) -> JsonObject:
+    payload: JsonObject = {
+        "parent_session_id": child.parent_session_id,
+        "parent_decision_id": child.parent_decision_id,
+        "input": child.to_dict()["input"],
+        "metadata": child.to_dict()["metadata"],
+    }
+    context_policy = child.to_dict()["context_policy"]
+    if context_policy:
+        payload["context_policy"] = context_policy
+    return payload
 
 
 def _approval_resolved_payload(approval_request: ApprovalRequest) -> JsonObject:

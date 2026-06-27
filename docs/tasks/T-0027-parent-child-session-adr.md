@@ -43,4 +43,4 @@
 - 决定 Child result 通过普通 `Signal(signal_type="child_result")` 回灌 Parent。
 - 决定第一版不新增独立 reducer DSL；Parent reducer merge 由 Parent activation 基于 `child_result` 产出普通 Decision。
 - 决定 Parent / Child 默认不共享 context、memory、capability grant 或 approval request；capability delegation 后续单独 ADR。
-- 新增 PR-0026 / T-0028 作为后续最小实现切片，仅覆盖 InMemory child session creation。
+- 新增 PR-0026 / T-0028 作为后续最小实现切片，仅覆盖 InMemory child session creation；PR-0026 现已完成。

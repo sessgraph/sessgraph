@@ -66,4 +66,4 @@ P0 durable Session runtime core 已完成本地核心闭环。第二阶段 / P1 
 
 ## 当前推荐下一步
 
-Safety/Auth ADR、InMemory capability policy gate、approval flow ADR、InMemory ApprovalRequest store、approval-required runner branch 和 approval result runtime flow 均已完成。PR-0024 的后续重评估见 `docs/state/post-safety-auth-reevaluation.md`；PR-0025 已完成 Parent/Child Session ADR，下一步进入 InMemory child session creation。
+Safety/Auth ADR、InMemory capability policy gate、approval flow ADR、InMemory ApprovalRequest store、approval-required runner branch 和 approval result runtime flow 均已完成。PR-0024 的后续重评估见 `docs/state/post-safety-auth-reevaluation.md`；PR-0025 已完成 Parent/Child Session ADR，PR-0026 已完成 InMemory child session creation，下一步进入 Child result Signal flow。

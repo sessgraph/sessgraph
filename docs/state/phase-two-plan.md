@@ -67,4 +67,4 @@ P0 已证明 durable Session runtime 的本地核心闭环：Session、Signal、
 
 ## 后续衔接
 
-P1 后续方向重评估结论是优先进入 Memory + Context。PR-0015 Memory + Context ADR、PR-0016 InMemory context builder 和 PR-0017 deterministic memory compaction example/test 已完成。PR-0018 到 PR-0023 已完成 Safety/Auth ADR、InMemory capability policy gate、approval flow ADR、InMemory ApprovalRequest store、approval-required runner branch 和 approval result runtime flow。PR-0024 已完成 Safety/Auth 收尾审查，PR-0025 已完成 Parent/Child Session ADR；下一步进入最小 InMemory child session creation。真实 provider、production policy、database、server 和 cloud 仍需后续单独立项。
+P1 后续方向重评估结论是优先进入 Memory + Context。PR-0015 Memory + Context ADR、PR-0016 InMemory context builder 和 PR-0017 deterministic memory compaction example/test 已完成。PR-0018 到 PR-0023 已完成 Safety/Auth ADR、InMemory capability policy gate、approval flow ADR、InMemory ApprovalRequest store、approval-required runner branch 和 approval result runtime flow。PR-0024 已完成 Safety/Auth 收尾审查，PR-0025 已完成 Parent/Child Session ADR，PR-0026 已完成最小 InMemory child session creation；下一步进入 Child result Signal flow。真实 provider、production policy、database、server 和 cloud 仍需后续单独立项。

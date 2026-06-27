@@ -25,6 +25,12 @@ from sessgraph.auth import (
     approval_request_id,
     capability_grant_id,
 )
+from sessgraph.children import (
+    ChildSessionRecord,
+    ChildSessionStatus,
+    InMemoryChildSessionStore,
+    child_session_id_for_decision,
+)
 from sessgraph.context import (
     ContextBuilder,
     ContextSnapshot,
@@ -87,6 +93,8 @@ __all__ = [
     "ApprovalStatus",
     "AuthContext",
     "CapabilityGrant",
+    "ChildSessionRecord",
+    "ChildSessionStatus",
     "Checkpoint",
     "ConcurrencyError",
     "ContextBuilder",
@@ -101,6 +109,7 @@ __all__ = [
     "FakeModel",
     "IdempotencyConflictError",
     "InMemoryApprovalRequestStore",
+    "InMemoryChildSessionStore",
     "InMemoryCheckpointStore",
     "InMemoryCapabilityGrantStore",
     "InMemoryEventStore",
@@ -137,5 +146,6 @@ __all__ = [
     "ValidationError",
     "approval_request_id",
     "capability_grant_id",
+    "child_session_id_for_decision",
     "memory_id_for_record",
 ]

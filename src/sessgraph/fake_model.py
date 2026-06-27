@@ -20,6 +20,11 @@ class FakeModel:
     job_type: str | None = None
     job_arguments: JsonObject | None = None
     job_idempotency_key: str | None = None
+    child_agent_id: str | None = None
+    child_input: JsonObject | None = None
+    child_metadata: JsonObject | None = None
+    child_context_policy: JsonObject | None = None
+    child_idempotency_key: str | None = None
 
     def decide(self, context: ActivationContext) -> Decision:
         if self.kind is DecisionKind.NOOP:
@@ -60,6 +65,24 @@ class FakeModel:
                 decision_id=_decision_id(context),
                 session_id=context.session.session_id,
                 kind=DecisionKind.SUBMIT_JOB,
+                payload=payload,
+                created_at=context.now,
+            )
+        if self.kind is DecisionKind.START_CHILD_SESSION:
+            payload = {
+                "child_agent_id": self.child_agent_id or "child-agent",
+                "input": self.child_input or {},
+            }
+            if self.child_metadata is not None:
+                payload["metadata"] = self.child_metadata
+            if self.child_context_policy is not None:
+                payload["context_policy"] = self.child_context_policy
+            if self.child_idempotency_key is not None:
+                payload["idempotency_key"] = self.child_idempotency_key
+            return Decision(
+                decision_id=_decision_id(context),
+                session_id=context.session.session_id,
+                kind=DecisionKind.START_CHILD_SESSION,
                 payload=payload,
                 created_at=context.now,
             )

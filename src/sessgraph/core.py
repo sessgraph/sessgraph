@@ -38,6 +38,7 @@ class DecisionKind(str, Enum):
     TOOL_CALL = "tool_call"
     ASK_USER = "ask_user"
     SUBMIT_JOB = "submit_job"
+    START_CHILD_SESSION = "start_child_session"
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,6 +252,16 @@ class Decision:
         if self.kind is DecisionKind.SUBMIT_JOB:
             _require_non_empty("payload.job_type", self.payload.get("job_type"))
             _copy_json_object("payload.arguments", self.payload.get("arguments"))
+            idempotency_key = self.payload.get("idempotency_key")
+            if idempotency_key is not None:
+                _require_non_empty("payload.idempotency_key", idempotency_key)
+        if self.kind is DecisionKind.START_CHILD_SESSION:
+            _require_non_empty("payload.child_agent_id", self.payload.get("child_agent_id"))
+            _copy_json_object("payload.input", self.payload.get("input"))
+            if "metadata" in self.payload:
+                _copy_json_object("payload.metadata", self.payload.get("metadata"))
+            if "context_policy" in self.payload:
+                _copy_json_object("payload.context_policy", self.payload.get("context_policy"))
             idempotency_key = self.payload.get("idempotency_key")
             if idempotency_key is not None:
                 _require_non_empty("payload.idempotency_key", idempotency_key)
