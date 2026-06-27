@@ -13,3 +13,4 @@
 | ACT-0005 | 已完成 | AI | 将 root agent 指令和已有文档统一为中文。 | `AGENTS.md`、`CLAUDE.md`、README、`docs/` 现有 Markdown 文档均以中文为主。 |
 | ACT-0006 | 已完成 | AI | 确认 P0 后下一优先级：package/release hygiene、async job/timer 或其他 v0.3+ 工作。 | 第二阶段规划已写入 `docs/state/phase-two-plan.md`，PR-0010 到 PR-0013 已进入拟议队列。 |
 | ACT-0007 | 已完成 | AI | 在 P1 timer/job 完成后，重新评估 Memory + Context、Safety/Auth、Parent/Child Session 的后续顺序。 | `docs/state/post-p1-reevaluation.md` 已记录结论：Memory + Context 已完成；Safety/Auth ADR 已完成；Parent/Child Session 后续单独 ADR。 |
+| ACT-0008 | 已完成 | AI | 在 Safety/Auth 本地确定性闭环完成后，重新评估下一阶段方向。 | `docs/state/post-safety-auth-reevaluation.md` 已记录结论：下一阶段优先进入 Parent/Child Session，先执行 PR-0025 / T-0027 ADR。 |

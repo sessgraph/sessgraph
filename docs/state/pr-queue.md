@@ -34,6 +34,8 @@
 | PR-0021 | 已完成 | InMemory ApprovalRequest store | `docs/tasks/T-0023-inmemory-approval-request-store.md` | ApprovalRequest record、deterministic id、InMemory store；不实现 runner flow | approval store tests；`make check` |
 | PR-0022 | 已完成 | Approval-required runner flow | `docs/tasks/T-0024-approval-required-runner-flow.md` | policy outcome 创建 ApprovalRequest、追加 `approval_requested` Event、Checkpoint 并暂停 action；不处理 `approval_result` | approval-required runner tests；`make check` |
 | PR-0023 | 已完成 | Approval result runtime flow | `docs/tasks/T-0025-approval-result-runtime-flow.md` | 处理 `approval_result` Signal、resolve ApprovalRequest、approved dispatch / denied skip / stale ignored；不接入外部审批服务 | approval result runtime tests；`make check` |
+| PR-0024 | 已完成 | Safety/Auth 收尾审查与下一阶段重评估 | `docs/tasks/T-0026-safety-auth-closeout-reevaluation.md` | 对照 ADR-0007 / ADR-0008 审查覆盖，固化下一阶段方向；不实现 runtime | 文档 diff review；`make check` |
+| PR-0025 | 待开始 | ADR 定义 Parent/Child Session 语义 | `docs/tasks/T-0027-parent-child-session-adr.md` | 定义 parent/child 创建、result、reducer、Checkpoint 和 Safety/Auth 边界；不实现 runtime | ADR review；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -244,6 +246,14 @@
 - 找不到、Session 不匹配或已终止的 approval result 会追加 `approval_result_ignored` Event、保存 Checkpoint，且不会分发原 action。
 - 新增 deterministic tests 覆盖 approved dispatch、denied skip、duplicate result idempotency、stale result ignored、Checkpoint round-trip 和 Event append-only；`make check` 通过。
 - 未实现 expired / canceled 外部入口、真实 identity provider、production policy、外部审批服务或 capability delegation。
+
+## PR-0024 完成记录
+
+- 新增 `docs/state/post-safety-auth-reevaluation.md`，对照 ADR-0007 / ADR-0008 审查 Safety/Auth 本地确定性覆盖。
+- 结论：Safety/Auth v0.5 本地确定性闭环已完成；下一阶段优先进入 Parent/Child Session，先写 ADR。
+- 新增 PR-0025 / T-0027 作为下一阶段第一个待开始切片。
+- 更新项目状态、风险、README、文档索引和阶段衔接说明。
+- 未实现新的 runtime 行为，未引入真实 identity provider、production policy、server、database 或 provider。
 
 ## 队列纪律
 

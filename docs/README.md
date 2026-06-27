@@ -9,9 +9,10 @@
 2. `docs/state/project-state.md`：项目目标、边界、P0 范围。
 3. `docs/state/phase-two-plan.md`：P0 后第二阶段规划。
 4. `docs/state/post-p1-reevaluation.md`：P1 后续方向重评估。
-5. `docs/DEVELOPMENT_PROCESS.md`：统一开发流程。
-6. `docs/state/pr-queue.md`：产品 PR 队列。
-7. `docs/tasks/`：任务规格。
+5. `docs/state/post-safety-auth-reevaluation.md`：Safety/Auth 收尾审查与下一阶段重评估。
+6. `docs/DEVELOPMENT_PROCESS.md`：统一开发流程。
+7. `docs/state/pr-queue.md`：产品 PR 队列。
+8. `docs/tasks/`：任务规格。
 
 ## 目录说明
 
