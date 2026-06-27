@@ -31,7 +31,7 @@
 ## 完成记录
 
 - 新增 `docs/state/post-safety-auth-reevaluation.md`，对照 ADR-0007 / ADR-0008 审查 Safety/Auth 本地确定性覆盖。
-- 结论：Safety/Auth v0.5 本地确定性闭环已完成；下一阶段优先进入 Parent/Child Session，先写 ADR。
-- 新增 PR-0025 / T-0027 作为下一阶段第一个待开始切片。
+- 结论：Safety/Auth v0.5 本地确定性闭环已完成；下一阶段优先进入 Parent/Child Session，先写 ADR。该 ADR 已由 PR-0025 完成。
+- 当时新增 PR-0025 / T-0027 作为下一阶段第一个切片；PR-0025 现已完成。
 - 更新项目状态、PR 队列、风险、README、文档索引和阶段衔接说明。
 - 未实现新的 runtime 行为，未引入真实 identity provider、production policy、server、database 或 provider。

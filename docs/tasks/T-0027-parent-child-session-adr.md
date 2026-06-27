@@ -1,6 +1,6 @@
 # T-0027: ADR 定义 Parent/Child Session 语义
 
-> 状态: 待开始
+> 状态: 已完成
 > PR: PR-0025
 > 最近更新: 2026-06-27
 
@@ -35,3 +35,12 @@
 
 - ADR review。
 - `make check`。
+
+## 完成记录
+
+- 新增 ADR-0009，定义 Parent/Child Session 语义。
+- 决定 Parent 通过 `DecisionKind.START_CHILD_SESSION` 请求 runtime 创建 Child Session。
+- 决定 Child result 通过普通 `Signal(signal_type="child_result")` 回灌 Parent。
+- 决定第一版不新增独立 reducer DSL；Parent reducer merge 由 Parent activation 基于 `child_result` 产出普通 Decision。
+- 决定 Parent / Child 默认不共享 context、memory、capability grant 或 approval request；capability delegation 后续单独 ADR。
+- 新增 PR-0026 / T-0028 作为后续最小实现切片，仅覆盖 InMemory child session creation。
