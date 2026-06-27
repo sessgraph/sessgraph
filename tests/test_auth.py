@@ -427,11 +427,171 @@ class ActivationRunnerPolicyGateTests(unittest.TestCase):
         self.assertEqual(result.events[-1].event_type, "approval_requested")
         self.assertEqual(result.events[-1].payload["resource"]["job_type"], "export")
 
+    def test_approval_result_approved_dispatches_original_tool_without_model(self) -> None:
+        fixture = _runner_fixture(
+            model=FakeModel(
+                kind=DecisionKind.TOOL_CALL,
+                tool_name="uppercase",
+                tool_arguments={"text": "hello"},
+            )
+        )
+        fixture.grant_store.save(_grant(constraints={"requires_approval": True}))
+        requested = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+        fixture.runner.model = ModelShouldNotRun()
+        _enqueue_approval_result(
+            fixture,
+            approval_id=requested.approval_request.approval_id,
+            approved=True,
+        )
+
+        result = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+
+        self.assertEqual(result.decision, requested.decision)
+        self.assertEqual(result.session.status, SessionStatus.IDLE)
+        self.assertEqual(result.approval_request.status, ApprovalStatus.APPROVED)
+        self.assertEqual(result.tool_result.output["text"], "HELLO")
+        self.assertEqual(fixture.tool_calls, [{"text": "hello"}])
+        self.assertEqual([event.event_type for event in result.events], [
+            "signal_received",
+            "approval_resolved",
+            "tool_call_requested",
+            "tool_result_produced",
+        ])
+        self.assertEqual([event.sequence for event in result.events], [3, 4, 5, 6])
+        self.assertEqual(result.events[1].payload["status"], "approved")
+        self.assertEqual(result.events[1].payload["resolved_by"]["actor_id"], "approver")
+        latest = fixture.checkpoint_store.latest_for_session("sess-1")
+        self.assertEqual(latest, result.checkpoint)
+        self.assertEqual(latest.event_sequence, 6)
+        self.assertEqual(latest.state["approval_request"]["status"], "approved")
+        self.assertEqual(latest.state["approval_result"]["approved"], True)
+        self.assertEqual(latest.state["decision"]["decision_id"], requested.decision.decision_id)
+        pending = fixture.inbox_store.list_for_session("sess-1")
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0].signal_type, "tool_result")
+
+    def test_approval_result_denied_resolves_and_skips_original_tool(self) -> None:
+        fixture = _runner_fixture(
+            model=FakeModel(
+                kind=DecisionKind.TOOL_CALL,
+                tool_name="uppercase",
+                tool_arguments={"text": "hello"},
+            )
+        )
+        fixture.grant_store.save(_grant(constraints={"requires_approval": True}))
+        requested = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+        fixture.runner.model = ModelShouldNotRun()
+        _enqueue_approval_result(
+            fixture,
+            approval_id=requested.approval_request.approval_id,
+            approved=False,
+            reason="denied_by_user",
+        )
+
+        result = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+
+        self.assertEqual(result.decision, requested.decision)
+        self.assertEqual(result.session.status, SessionStatus.IDLE)
+        self.assertEqual(result.approval_request.status, ApprovalStatus.DENIED)
+        self.assertIsNone(result.tool_result)
+        self.assertEqual(fixture.tool_calls, [])
+        self.assertEqual([event.event_type for event in result.events], [
+            "signal_received",
+            "approval_resolved",
+        ])
+        self.assertEqual(result.events[1].payload["status"], "denied")
+        self.assertEqual(result.events[1].payload["reason"], "denied_by_user")
+        self.assertEqual(fixture.approval_store.list_pending_for_session("sess-1"), ())
+        self.assertEqual(fixture.inbox_store.list_for_session("sess-1"), ())
+        self.assertEqual(
+            result.checkpoint.state["approval_request"]["status"],
+            "denied",
+        )
+        self.assertNotIn("tool_result", result.checkpoint.state)
+
+    def test_duplicate_approval_result_is_ignored_after_terminal_request(self) -> None:
+        fixture = _runner_fixture(
+            model=FakeModel(kind=DecisionKind.SUBMIT_JOB, job_type="export"),
+            include_job_store=True,
+        )
+        fixture.grant_store.save(
+            _grant(
+                action_kind="submit_job",
+                resource={"job_type": "export"},
+                constraints={"requires_approval": True},
+            )
+        )
+        requested = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+        fixture.runner.model = ModelShouldNotRun()
+        _enqueue_approval_result(
+            fixture,
+            approval_id=requested.approval_request.approval_id,
+            approved=True,
+            signal_id="sig-approval-1",
+        )
+        approved = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+        _enqueue_approval_result(
+            fixture,
+            approval_id=requested.approval_request.approval_id,
+            approved=True,
+            signal_id="sig-approval-duplicate",
+        )
+
+        duplicate = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+
+        self.assertEqual(approved.approval_request.status, ApprovalStatus.APPROVED)
+        self.assertEqual(len(fixture.job_store.list_for_session("sess-1")), 1)
+        self.assertIsNone(duplicate.job)
+        self.assertEqual(duplicate.approval_request.status, ApprovalStatus.APPROVED)
+        self.assertEqual([event.event_type for event in duplicate.events], [
+            "signal_received",
+            "approval_result_ignored",
+        ])
+        self.assertEqual(
+            duplicate.events[1].payload["reason"],
+            "approval_not_pending",
+        )
+        self.assertEqual(
+            duplicate.checkpoint.state["approval_result_ignored"]["request_status"],
+            "approved",
+        )
+
+    def test_stale_approval_result_is_ignored_and_checkpointed(self) -> None:
+        fixture = _runner_fixture(
+            model=ModelShouldNotRun(),
+            enqueue_signal=False,
+        )
+        _enqueue_approval_result(
+            fixture,
+            approval_id="missing-approval",
+            approved=True,
+        )
+
+        result = fixture.runner.run_once("sess-1", auth_context=_auth_context())
+
+        self.assertIsNone(result.decision)
+        self.assertIsNone(result.approval_request)
+        self.assertIsNone(result.tool_result)
+        self.assertEqual(result.session.status, SessionStatus.IDLE)
+        self.assertEqual([event.event_type for event in result.events], [
+            "signal_received",
+            "approval_result_ignored",
+        ])
+        self.assertEqual(result.events[1].payload["reason"], "approval_not_found")
+        self.assertNotIn("decision", result.checkpoint.state)
+        self.assertEqual(
+            result.checkpoint.state["approval_result_ignored"]["approval_id"],
+            "missing-approval",
+        )
+
 
 @dataclass
 class RunnerFixture:
     runner: ActivationRunner
+    session_store: InMemorySessionStore
     inbox_store: InMemoryInboxStore
+    event_store: InMemoryEventStore
+    checkpoint_store: InMemoryCheckpointStore
     grant_store: InMemoryCapabilityGrantStore
     approval_store: InMemoryApprovalRequestStore
     job_store: InMemoryJobStore
@@ -452,6 +612,7 @@ def _runner_fixture(
     *,
     model: object,
     include_job_store: bool = False,
+    enqueue_signal: bool = True,
 ) -> RunnerFixture:
     clock = FixedClock(NOW)
     agent = AgentDefinition(
@@ -470,16 +631,17 @@ def _runner_fixture(
     tool_calls: list[dict[str, object]] = []
 
     session_store.create(session)
-    inbox_store.enqueue(
-        Signal(
-            signal_id="sig-1",
-            session_id="sess-1",
-            signal_type="user_message",
-            payload={"content": "hello"},
-            created_at=clock(),
-            idempotency_key="request-1",
+    if enqueue_signal:
+        inbox_store.enqueue(
+            Signal(
+                signal_id="sig-1",
+                session_id="sess-1",
+                signal_type="user_message",
+                payload={"content": "hello"},
+                created_at=clock(),
+                idempotency_key="request-1",
+            )
         )
-    )
 
     registry = ToolRegistry()
     registry.register(
@@ -505,7 +667,10 @@ def _runner_fixture(
     )
     return RunnerFixture(
         runner=runner,
+        session_store=session_store,
         inbox_store=inbox_store,
+        event_store=event_store,
+        checkpoint_store=checkpoint_store,
         grant_store=grant_store,
         approval_store=approval_store,
         job_store=job_store,
@@ -519,6 +684,38 @@ def _uppercase(
 ) -> dict[str, object]:
     tool_calls.append(dict(arguments))
     return {"text": str(arguments["text"]).upper()}
+
+
+@dataclass(frozen=True, slots=True)
+class ModelShouldNotRun:
+    def decide(self, context: object) -> object:
+        raise AssertionError("model must not be called for approval_result signals")
+
+
+def _enqueue_approval_result(
+    fixture: RunnerFixture,
+    *,
+    approval_id: str,
+    approved: bool,
+    signal_id: str = "sig-approval-1",
+    reason: str = "approved_by_user",
+) -> Signal:
+    return fixture.inbox_store.enqueue(
+        Signal(
+            signal_id=signal_id,
+            session_id="sess-1",
+            signal_type="approval_result",
+            payload={
+                "approval_id": approval_id,
+                "approved": approved,
+                "resolved_by": _actor("approver"),
+                "reason": reason,
+                "data": {"ticket": "APP-1"},
+            },
+            created_at=NOW + timedelta(minutes=1),
+            idempotency_key=f"approval-result:{signal_id}",
+        )
+    )
 
 
 def _auth_context(

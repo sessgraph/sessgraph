@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Protocol
 
 from sessgraph.auth import (
     ApprovalRequest,
+    ApprovalStatus,
     AuthContext,
     InMemoryApprovalRequestStore,
     InMemoryPolicyGate,
@@ -26,6 +27,7 @@ from sessgraph.core import (
     Session,
     SessionStatus,
     Signal,
+    ValidationError,
 )
 from sessgraph.jobs import InMemoryJobStore, JobRecord, job_id_for_decision
 from sessgraph.stores import (
@@ -80,6 +82,15 @@ class ActivationResult:
     approval_request: ApprovalRequest | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class _ApprovalResultPayload:
+    approval_id: str
+    approved: bool
+    resolved_by: JsonObject
+    reason: str
+    data: JsonObject
+
+
 @dataclass(slots=True)
 class ActivationRunner:
     """Wake one Session from one pending Signal and dispatch one Decision."""
@@ -118,6 +129,13 @@ class ActivationRunner:
             updated_at=self._now(),
             revision=session.revision + 1,
         )
+        if signal.signal_type == "approval_result":
+            return self._run_approval_result(
+                session=session,
+                running=running,
+                signal=signal,
+            )
+
         context_snapshot = self._build_context(running, signal)
         context = ActivationContext(
             agent=self.agent,
@@ -319,26 +337,33 @@ class ActivationRunner:
         checkpoint_id: str,
         session: Session,
         signal: Signal,
-        decision: Decision,
+        decision: Decision | None,
         events: tuple[Event, ...],
         tool_result: ToolResult | None,
         job: JobRecord | None,
         context_snapshot: ContextSnapshot | None,
         policy_decision: PolicyDecision | None,
         approval_request: ApprovalRequest | None,
+        approval_result: JsonObject | None = None,
+        approval_result_ignored: JsonObject | None = None,
     ) -> Checkpoint:
         state: JsonObject = {
             "session": session.to_dict(),
             "signal": signal.to_dict(),
-            "decision": decision.to_dict(),
             "event_ids": [event.event_id for event in events],
         }
+        if decision is not None:
+            state["decision"] = decision.to_dict()
         if context_snapshot is not None:
             state["context_snapshot"] = _context_snapshot_metadata(context_snapshot)
         if policy_decision is not None:
             state["policy_decision"] = policy_decision.to_dict()
         if approval_request is not None:
             state["approval_request"] = approval_request.to_dict()
+        if approval_result is not None:
+            state["approval_result"] = approval_result
+        if approval_result_ignored is not None:
+            state["approval_result_ignored"] = approval_result_ignored
         if tool_result is not None:
             state["tool_result"] = tool_result.to_dict()
         if job is not None:
@@ -377,6 +402,194 @@ class ActivationRunner:
             auth_context=auth_context,
             action_kind=action_kind,
             resource=resource,
+        )
+
+    def _run_approval_result(
+        self,
+        *,
+        session: Session,
+        running: Session,
+        signal: Signal,
+    ) -> ActivationResult:
+        if self.approval_store is None:
+            raise DecisionRejectedError(
+                "approval_store is required for approval_result signals"
+            )
+        approval_result = _approval_result_payload_from_signal(signal)
+        approval_request = self.approval_store.get(approval_result.approval_id)
+        ignored_payload: JsonObject | None = None
+        decision: Decision | None = None
+        resolved_approval: ApprovalRequest | None = None
+        tool_result: ToolResult | None = None
+        job: JobRecord | None = None
+
+        if approval_request is None:
+            ignored_payload = _approval_result_ignored_payload(
+                approval_result=approval_result,
+                reason="approval_not_found",
+                approval_request=None,
+            )
+        elif approval_request.session_id != session.session_id:
+            ignored_payload = _approval_result_ignored_payload(
+                approval_result=approval_result,
+                reason="approval_session_mismatch",
+                approval_request=approval_request,
+            )
+        elif approval_request.status is not ApprovalStatus.PENDING:
+            ignored_payload = _approval_result_ignored_payload(
+                approval_result=approval_result,
+                reason="approval_not_pending",
+                approval_request=approval_request,
+            )
+        else:
+            decision = _decision_from_approval_request(approval_request)
+            if approval_result.approved:
+                self._validate_approved_dispatch_dependencies(decision)
+
+        running = self.session_store.update(running, expected_revision=session.revision)
+        signal_event = self._append_event(
+            session_id=session.session_id,
+            event_type="signal_received",
+            payload={
+                "signal_id": signal.signal_id,
+                "signal_type": signal.signal_type,
+                "idempotency_key": signal.idempotency_key,
+                "payload": signal.to_dict()["payload"],
+            },
+            source_signal_id=signal.signal_id,
+        )
+        events = [signal_event]
+
+        if ignored_payload is not None:
+            ignored_event = self._append_event(
+                session_id=session.session_id,
+                event_type="approval_result_ignored",
+                payload=ignored_payload,
+                source_signal_id=signal.signal_id,
+            )
+            events.append(ignored_event)
+            final_status = session.status
+        else:
+            status = (
+                ApprovalStatus.APPROVED
+                if approval_result.approved
+                else ApprovalStatus.DENIED
+            )
+            resolved_approval = self.approval_store.resolve(
+                approval_result.approval_id,
+                status=status,
+                resolved_at=self._now(),
+                resolved_by=approval_result.resolved_by,
+                reason=approval_result.reason,
+                data=approval_result.data,
+            )
+            resolved_event = self._append_event(
+                session_id=session.session_id,
+                event_type="approval_resolved",
+                payload=_approval_resolved_payload(resolved_approval),
+                source_signal_id=signal.signal_id,
+            )
+            events.append(resolved_event)
+
+            if approval_result.approved:
+                if decision is None:
+                    raise DecisionRejectedError("approved approval result has no action decision")
+                tool_result = self._execute_tool_call(decision)
+                job = self._submit_job(decision)
+
+                if tool_result is not None:
+                    tool_call_event = self._append_event(
+                        session_id=session.session_id,
+                        event_type="tool_call_requested",
+                        payload={
+                            "decision_id": decision.decision_id,
+                            "tool_name": tool_result.tool_name,
+                            "arguments": decision.payload["arguments"],
+                        },
+                        source_signal_id=signal.signal_id,
+                    )
+                    tool_result_event = self._append_event(
+                        session_id=session.session_id,
+                        event_type="tool_result_produced",
+                        payload={
+                            "decision_id": decision.decision_id,
+                            "result": tool_result.to_dict(),
+                        },
+                        source_signal_id=signal.signal_id,
+                    )
+                    events.extend([tool_call_event, tool_result_event])
+
+                if job is not None:
+                    job_event = self._append_event(
+                        session_id=session.session_id,
+                        event_type="job_submitted",
+                        payload={
+                            "decision_id": decision.decision_id,
+                            "job_id": job.job_id,
+                            "job": job.to_dict(),
+                        },
+                        source_signal_id=signal.signal_id,
+                    )
+                    events.append(job_event)
+
+                final_status = _status_for_decision(decision)
+            else:
+                final_status = SessionStatus.IDLE
+
+        checkpoint_id = _checkpoint_id(session.session_id, running.revision + 1, events[-1].sequence)
+        final_session = replace(
+            running,
+            status=final_status,
+            updated_at=self._now(),
+            revision=running.revision + 1,
+            checkpoint_id=checkpoint_id,
+        )
+        final_session = self.session_store.update(final_session, expected_revision=running.revision)
+        checkpoint = self._save_checkpoint(
+            checkpoint_id=checkpoint_id,
+            session=final_session,
+            signal=signal,
+            decision=decision,
+            events=tuple(events),
+            tool_result=tool_result,
+            job=job,
+            context_snapshot=None,
+            policy_decision=None,
+            approval_request=resolved_approval or approval_request,
+            approval_result=_approval_result_checkpoint_payload(approval_result),
+            approval_result_ignored=ignored_payload,
+        )
+        if tool_result is not None and decision is not None:
+            self.inbox_store.enqueue(
+                Signal(
+                    signal_id=_tool_result_signal_id(session.session_id, decision.decision_id),
+                    session_id=session.session_id,
+                    signal_type="tool_result",
+                    payload={
+                        "decision_id": decision.decision_id,
+                        "result": tool_result.to_dict(),
+                    },
+                    created_at=self._now(),
+                    idempotency_key=f"tool_result:{decision.decision_id}",
+                )
+            )
+        popped = self.inbox_store.pop_next(session.session_id)
+        if popped is None or popped.signal_id != signal.signal_id:
+            raise DecisionRejectedError("pending signal changed during activation")
+
+        return ActivationResult(
+            session_id=session.session_id,
+            activated=True,
+            session=final_session,
+            signal=signal,
+            decision=decision,
+            events=tuple(events),
+            checkpoint=checkpoint,
+            tool_result=tool_result,
+            job=job,
+            context_snapshot=None,
+            policy_decision=None,
+            approval_request=resolved_approval or approval_request,
         )
 
     def _new_approval_request(
@@ -425,6 +638,12 @@ class ActivationRunner:
                 "approval_store is required for approval-required decisions"
             )
         return self.approval_store.create(approval_request)
+
+    def _validate_approved_dispatch_dependencies(self, decision: Decision) -> None:
+        if decision.kind is DecisionKind.TOOL_CALL and self.tool_executor is None:
+            raise DecisionRejectedError("tool_executor is required for approved tool_call")
+        if decision.kind is DecisionKind.SUBMIT_JOB and self.job_store is None:
+            raise DecisionRejectedError("job_store is required for approved submit_job")
 
     def _validate_decision(self, decision: Decision, session_id: str) -> None:
         if decision.session_id != session_id:
@@ -555,6 +774,109 @@ def _approval_requested_payload(
         },
         "reason": policy_data["reason"],
     }
+
+
+def _approval_result_payload_from_signal(signal: Signal) -> _ApprovalResultPayload:
+    payload = signal.payload
+    return _ApprovalResultPayload(
+        approval_id=_required_payload_string(payload, "approval_id"),
+        approved=_required_payload_bool(payload, "approved"),
+        resolved_by=_required_payload_object(payload, "resolved_by"),
+        reason=_required_payload_string(payload, "reason"),
+        data=_optional_payload_object(payload, "data"),
+    )
+
+
+def _decision_from_approval_request(approval_request: ApprovalRequest) -> Decision:
+    decision_data = approval_request.action_payload.get("decision")
+    if not isinstance(decision_data, Mapping):
+        raise DecisionRejectedError("approval action_payload.decision must be a JSON object")
+    try:
+        decision = Decision.from_dict(decision_data)
+    except ValidationError as exc:
+        raise DecisionRejectedError("approval action_payload.decision is invalid") from exc
+    if decision.session_id != approval_request.session_id:
+        raise DecisionRejectedError("approval decision session_id does not match request")
+    if decision.decision_id != approval_request.decision_id:
+        raise DecisionRejectedError("approval decision_id does not match request")
+    if decision.kind.value != approval_request.action_kind:
+        raise DecisionRejectedError("approval decision kind does not match action_kind")
+    if decision.kind not in {DecisionKind.TOOL_CALL, DecisionKind.SUBMIT_JOB}:
+        raise DecisionRejectedError(
+            f"unsupported approval action kind: {decision.kind.value}"
+        )
+    return decision
+
+
+def _approval_resolved_payload(approval_request: ApprovalRequest) -> JsonObject:
+    approval_data = approval_request.to_dict()
+    return {
+        "approval_id": approval_request.approval_id,
+        "decision_id": approval_request.decision_id,
+        "action_kind": approval_request.action_kind,
+        "resource": approval_data["resource"],
+        "status": approval_request.status.value,
+        "resolved_by": approval_data["resolved_by"],
+        "reason": approval_request.reason,
+        "data": approval_data["data"],
+    }
+
+
+def _approval_result_checkpoint_payload(approval_result: _ApprovalResultPayload) -> JsonObject:
+    return {
+        "approval_id": approval_result.approval_id,
+        "approved": approval_result.approved,
+        "resolved_by": approval_result.resolved_by,
+        "reason": approval_result.reason,
+        "data": approval_result.data,
+    }
+
+
+def _approval_result_ignored_payload(
+    *,
+    approval_result: _ApprovalResultPayload,
+    reason: str,
+    approval_request: ApprovalRequest | None,
+) -> JsonObject:
+    payload: dict[str, object] = {
+        "approval_id": approval_result.approval_id,
+        "approved": approval_result.approved,
+        "reason": reason,
+    }
+    if approval_request is not None:
+        payload["request_status"] = approval_request.status.value
+        payload["request_session_id"] = approval_request.session_id
+        payload["decision_id"] = approval_request.decision_id
+        payload["action_kind"] = approval_request.action_kind
+    return payload
+
+
+def _required_payload_string(payload: JsonObject, field_name: str) -> str:
+    value = payload.get(field_name)
+    if not isinstance(value, str) or not value.strip():
+        raise DecisionRejectedError(f"approval_result.{field_name} must be a non-empty string")
+    return value
+
+
+def _required_payload_bool(payload: JsonObject, field_name: str) -> bool:
+    value = payload.get(field_name)
+    if not isinstance(value, bool):
+        raise DecisionRejectedError(f"approval_result.{field_name} must be a boolean")
+    return value
+
+
+def _required_payload_object(payload: JsonObject, field_name: str) -> JsonObject:
+    value = payload.get(field_name)
+    if not isinstance(value, Mapping):
+        raise DecisionRejectedError(f"approval_result.{field_name} must be a JSON object")
+    return value
+
+
+def _optional_payload_object(payload: JsonObject, field_name: str) -> JsonObject:
+    value = payload.get(field_name, {})
+    if not isinstance(value, Mapping):
+        raise DecisionRejectedError(f"approval_result.{field_name} must be a JSON object")
+    return value
 
 
 def _context_snapshot_metadata(snapshot: ContextSnapshot) -> JsonObject:

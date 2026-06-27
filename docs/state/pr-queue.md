@@ -33,6 +33,7 @@
 | PR-0020 | 已完成 | ADR 定义 approval flow 语义 | `docs/tasks/T-0022-approval-flow-adr.md` | ApprovalRequest、approval_result Signal、approval Event/Checkpoint 边界；不实现 runtime | ADR review；`make check` |
 | PR-0021 | 已完成 | InMemory ApprovalRequest store | `docs/tasks/T-0023-inmemory-approval-request-store.md` | ApprovalRequest record、deterministic id、InMemory store；不实现 runner flow | approval store tests；`make check` |
 | PR-0022 | 已完成 | Approval-required runner flow | `docs/tasks/T-0024-approval-required-runner-flow.md` | policy outcome 创建 ApprovalRequest、追加 `approval_requested` Event、Checkpoint 并暂停 action；不处理 `approval_result` | approval-required runner tests；`make check` |
+| PR-0023 | 已完成 | Approval result runtime flow | `docs/tasks/T-0025-approval-result-runtime-flow.md` | 处理 `approval_result` Signal、resolve ApprovalRequest、approved dispatch / denied skip / stale ignored；不接入外部审批服务 | approval result runtime tests；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -233,6 +234,16 @@
 - approval-required 时不会执行 tool，也不会创建 job。
 - 新增 deterministic policy/runner tests；`make check` 通过。
 - 未实现 `approval_result` Signal dispatch、approved dispatch、denied skip、duplicate result idempotency 或 stale result ignored。
+
+## PR-0023 完成记录
+
+- `ActivationRunner` 对 `approval_result` Signal 走专门 runtime 分支，不调用 model。
+- Runtime 会校验 approval result payload，并查找 matching pending `ApprovalRequest`。
+- approved 结果会 resolve ApprovalRequest、追加 `approval_resolved` Event、基于原 Decision 分发 `tool_call` / `submit_job`，并保存 Checkpoint。
+- denied 结果会 resolve ApprovalRequest、追加 `approval_resolved` Event、跳过原 action，并保存 Checkpoint。
+- 找不到、Session 不匹配或已终止的 approval result 会追加 `approval_result_ignored` Event、保存 Checkpoint，且不会分发原 action。
+- 新增 deterministic tests 覆盖 approved dispatch、denied skip、duplicate result idempotency、stale result ignored、Checkpoint round-trip 和 Event append-only；`make check` 通过。
+- 未实现 expired / canceled 外部入口、真实 identity provider、production policy、外部审批服务或 capability delegation。
 
 ## 队列纪律
 
