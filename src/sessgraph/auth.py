@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from hashlib import sha256
 import json
 from typing import Any
@@ -22,9 +23,19 @@ from sessgraph.core import (
     _require_non_empty,
     _require_schema_version,
 )
-from sessgraph.stores import IdempotencyConflictError
+from sessgraph.stores import ConcurrencyError, IdempotencyConflictError, RecordNotFoundError
 
 POLICY_ID = "inmemory-capability-v1"
+
+
+class ApprovalStatus(str, Enum):
+    """Durable lifecycle status for runtime-side approval requests."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    DENIED = "denied"
+    EXPIRED = "expired"
+    CANCELED = "canceled"
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +225,129 @@ class PolicyDecision:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class ApprovalRequest:
+    """Durable record for one action paused by a runtime approval gate."""
+
+    approval_id: str
+    session_id: str
+    decision_id: str
+    signal_id: str
+    action_kind: str
+    resource: JsonObject
+    action_payload: JsonObject
+    requesting_actor: JsonObject
+    created_at: datetime
+    reason: str
+    status: ApprovalStatus = ApprovalStatus.PENDING
+    resolved_at: datetime | None = None
+    resolved_by: JsonObject | None = None
+    data: JsonObject = field(default_factory=dict)
+    idempotency_key: str | None = None
+
+    def __post_init__(self) -> None:
+        _require_non_empty("approval_id", self.approval_id)
+        _require_non_empty("session_id", self.session_id)
+        _require_non_empty("decision_id", self.decision_id)
+        _require_non_empty("signal_id", self.signal_id)
+        _require_non_empty("action_kind", self.action_kind)
+        _require_datetime("created_at", self.created_at)
+        _require_non_empty("reason", self.reason)
+        if self.idempotency_key is not None:
+            _require_non_empty("idempotency_key", self.idempotency_key)
+        object.__setattr__(
+            self,
+            "status",
+            _coerce_enum("status", self.status, ApprovalStatus),
+        )
+        if self.resolved_at is not None:
+            _require_datetime("resolved_at", self.resolved_at)
+        object.__setattr__(self, "resource", _freeze_json_object("resource", self.resource))
+        object.__setattr__(
+            self,
+            "action_payload",
+            _freeze_json_object("action_payload", self.action_payload),
+        )
+        object.__setattr__(
+            self,
+            "requesting_actor",
+            _freeze_json_object("requesting_actor", self.requesting_actor),
+        )
+        if self.resolved_by is not None:
+            object.__setattr__(
+                self,
+                "resolved_by",
+                _freeze_json_object("resolved_by", self.resolved_by),
+            )
+        object.__setattr__(self, "data", _freeze_json_object("data", self.data))
+        _validate_approval_lifecycle(self)
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status is not ApprovalStatus.PENDING
+
+    def to_dict(self) -> JsonObject:
+        return {
+            "schema_version": 1,
+            "approval_id": self.approval_id,
+            "session_id": self.session_id,
+            "decision_id": self.decision_id,
+            "signal_id": self.signal_id,
+            "action_kind": self.action_kind,
+            "resource": _copy_json_object("resource", self.resource),
+            "action_payload": _copy_json_object("action_payload", self.action_payload),
+            "requesting_actor": _copy_json_object("requesting_actor", self.requesting_actor),
+            "status": self.status.value,
+            "created_at": _datetime_to_json(self.created_at),
+            "resolved_at": (
+                _datetime_to_json(self.resolved_at) if self.resolved_at is not None else None
+            ),
+            "resolved_by": (
+                _copy_json_object("resolved_by", self.resolved_by)
+                if self.resolved_by is not None
+                else None
+            ),
+            "reason": self.reason,
+            "data": _copy_json_object("data", self.data),
+            "idempotency_key": self.idempotency_key,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "ApprovalRequest":
+        _require_schema_version(data)
+        resolved_at = data.get("resolved_at")
+        resolved_by = data.get("resolved_by")
+        return cls(
+            approval_id=_require_field(data, "approval_id"),
+            session_id=_require_field(data, "session_id"),
+            decision_id=_require_field(data, "decision_id"),
+            signal_id=_require_field(data, "signal_id"),
+            action_kind=_require_field(data, "action_kind"),
+            resource=_copy_json_object("resource", _require_field(data, "resource")),
+            action_payload=_copy_json_object(
+                "action_payload", _require_field(data, "action_payload")
+            ),
+            requesting_actor=_copy_json_object(
+                "requesting_actor", _require_field(data, "requesting_actor")
+            ),
+            status=_require_field(data, "status"),
+            created_at=_datetime_from_json(_require_field(data, "created_at"), "created_at"),
+            resolved_at=(
+                _datetime_from_json(resolved_at, "resolved_at")
+                if resolved_at is not None
+                else None
+            ),
+            resolved_by=(
+                _copy_json_object("resolved_by", resolved_by)
+                if resolved_by is not None
+                else None
+            ),
+            reason=_require_field(data, "reason"),
+            data=_copy_json_object("data", data.get("data", {})),
+            idempotency_key=data.get("idempotency_key"),
+        )
+
+
 @dataclass
 class InMemoryCapabilityGrantStore:
     """Store CapabilityGrants by id and session."""
@@ -262,6 +396,112 @@ class InMemoryCapabilityGrantStore:
         now: datetime,
     ) -> tuple[CapabilityGrant, ...]:
         return tuple(grant for grant in self.list_for_session(session_id) if grant.is_active(now))
+
+
+@dataclass
+class InMemoryApprovalRequestStore:
+    """Store ApprovalRequests by id, Session, and idempotency key."""
+
+    _approvals_by_id: dict[str, ApprovalRequest] = field(default_factory=dict)
+    _approval_ids_by_session: dict[str, list[str]] = field(default_factory=dict)
+    _approval_ids_by_idempotency: dict[tuple[str, str], str] = field(default_factory=dict)
+
+    def create(self, approval: ApprovalRequest) -> ApprovalRequest:
+        if approval.status is not ApprovalStatus.PENDING:
+            raise ValidationError("approval requests must start in pending status")
+
+        existing = self._approvals_by_id.get(approval.approval_id)
+        if existing is not None:
+            _raise_if_approval_different(
+                existing,
+                approval,
+                f"approval id conflict: {approval.approval_id}",
+            )
+            return _snapshot_approval(existing)
+
+        if approval.idempotency_key is not None:
+            idempotency_ref = (approval.session_id, approval.idempotency_key)
+            existing_approval_id = self._approval_ids_by_idempotency.get(idempotency_ref)
+            if existing_approval_id is not None:
+                existing_approval = self._approvals_by_id[existing_approval_id]
+                _raise_if_approval_different(
+                    existing_approval,
+                    approval,
+                    f"idempotency key conflict: {approval.idempotency_key}",
+                )
+                return _snapshot_approval(existing_approval)
+            self._approval_ids_by_idempotency[idempotency_ref] = approval.approval_id
+
+        self._approvals_by_id[approval.approval_id] = _snapshot_approval(approval)
+        self._approval_ids_by_session.setdefault(approval.session_id, []).append(
+            approval.approval_id
+        )
+        return _snapshot_approval(approval)
+
+    def get(self, approval_id: str) -> ApprovalRequest | None:
+        approval = self._approvals_by_id.get(approval_id)
+        if approval is None:
+            return None
+        return _snapshot_approval(approval)
+
+    def list_for_session(self, session_id: str) -> tuple[ApprovalRequest, ...]:
+        approval_ids = self._approval_ids_by_session.get(session_id, [])
+        approvals = [self._approvals_by_id[approval_id] for approval_id in approval_ids]
+        approvals.sort(key=lambda approval: (approval.created_at, approval.approval_id))
+        return tuple(_snapshot_approval(approval) for approval in approvals)
+
+    def list_pending_for_session(self, session_id: str) -> tuple[ApprovalRequest, ...]:
+        return tuple(
+            approval
+            for approval in self.list_for_session(session_id)
+            if approval.status is ApprovalStatus.PENDING
+        )
+
+    def resolve(
+        self,
+        approval_id: str,
+        *,
+        status: ApprovalStatus,
+        resolved_at: datetime,
+        resolved_by: JsonObject,
+        reason: str,
+        data: JsonObject | None = None,
+    ) -> ApprovalRequest:
+        status = _coerce_enum("status", status, ApprovalStatus)
+        if status is ApprovalStatus.PENDING:
+            raise ValidationError("resolved approval status must be terminal")
+        _require_datetime("resolved_at", resolved_at)
+        checked_resolved_by = _copy_json_object("resolved_by", resolved_by)
+        _require_non_empty("reason", reason)
+        checked_data = _copy_json_object("data", data or {})
+
+        current = self._approvals_by_id.get(approval_id)
+        if current is None:
+            raise RecordNotFoundError(f"approval request does not exist: {approval_id}")
+        resolved = ApprovalRequest(
+            approval_id=current.approval_id,
+            session_id=current.session_id,
+            decision_id=current.decision_id,
+            signal_id=current.signal_id,
+            action_kind=current.action_kind,
+            resource=current.resource,
+            action_payload=current.action_payload,
+            requesting_actor=current.requesting_actor,
+            status=status,
+            created_at=current.created_at,
+            resolved_at=resolved_at,
+            resolved_by=checked_resolved_by,
+            reason=reason,
+            data=checked_data,
+            idempotency_key=current.idempotency_key,
+        )
+        if current.is_terminal:
+            if current == resolved:
+                return _snapshot_approval(current)
+            raise ConcurrencyError(f"approval request already resolved: {approval_id}")
+
+        self._approvals_by_id[approval_id] = _snapshot_approval(resolved)
+        return _snapshot_approval(resolved)
 
 
 @dataclass(slots=True)
@@ -377,6 +617,30 @@ def capability_grant_id(
     return f"{session_id}:grant:{sha256(encoded).hexdigest()[:16]}"
 
 
+def approval_request_id(
+    *,
+    session_id: str,
+    decision_id: str,
+    action_kind: str,
+    resource: JsonObject,
+    idempotency_key: str | None = None,
+) -> str:
+    _require_non_empty("session_id", session_id)
+    _require_non_empty("decision_id", decision_id)
+    _require_non_empty("action_kind", action_kind)
+    if idempotency_key is not None:
+        _require_non_empty("idempotency_key", idempotency_key)
+    payload = {
+        "action_kind": action_kind,
+        "decision_id": decision_id,
+        "idempotency_key": idempotency_key,
+        "resource": _copy_json_object("resource", resource),
+        "session_id": session_id,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return f"{session_id}:approval:{sha256(encoded).hexdigest()[:16]}"
+
+
 def _grant_matches(
     *,
     grant: CapabilityGrant,
@@ -442,6 +706,27 @@ def _coerce_string_tuple(field_name: str, value: Any) -> tuple[str, ...]:
     return result
 
 
+def _coerce_enum(field_name: str, value: Any, enum_type: type[Enum]) -> Enum:
+    if isinstance(value, enum_type):
+        return value
+    try:
+        return enum_type(value)
+    except ValueError as exc:
+        allowed = ", ".join(member.value for member in enum_type)
+        raise ValidationError(f"{field_name} must be one of: {allowed}") from exc
+
+
+def _validate_approval_lifecycle(approval: ApprovalRequest) -> None:
+    if approval.status is ApprovalStatus.PENDING:
+        if approval.resolved_at is not None or approval.resolved_by is not None:
+            raise ValidationError("pending approvals must not include resolution fields")
+        return
+    if approval.resolved_at is None or approval.resolved_by is None:
+        raise ValidationError("terminal approvals require resolved_at and resolved_by")
+    if approval.resolved_at < approval.created_at:
+        raise ValidationError("resolved_at must be greater than or equal to created_at")
+
+
 def _raise_if_different(
     existing: CapabilityGrant,
     incoming: CapabilityGrant,
@@ -451,8 +736,21 @@ def _raise_if_different(
         raise IdempotencyConflictError(message)
 
 
+def _raise_if_approval_different(
+    existing: ApprovalRequest,
+    incoming: ApprovalRequest,
+    message: str,
+) -> None:
+    if existing.to_dict() != incoming.to_dict():
+        raise IdempotencyConflictError(message)
+
+
 def _snapshot_grant(grant: CapabilityGrant) -> CapabilityGrant:
     return CapabilityGrant.from_dict(grant.to_dict())
+
+
+def _snapshot_approval(approval: ApprovalRequest) -> ApprovalRequest:
+    return ApprovalRequest.from_dict(approval.to_dict())
 
 
 def _utcnow() -> datetime:

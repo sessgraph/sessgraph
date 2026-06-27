@@ -31,6 +31,7 @@
 | PR-0018 | 已完成 | ADR 定义 Safety/Auth 语义 | `docs/tasks/T-0020-safety-auth-adr.md` | Authorization、approval、capability grant、AuthContext 边界；不实现 runtime | ADR review；`make check` |
 | PR-0019 | 已完成 | InMemory capability policy gate | `docs/tasks/T-0021-inmemory-capability-policy-gate.md` | 本地 AuthContext、CapabilityGrant 和 tool/job authorization gate | auth deterministic tests；runner integration tests；`make check` |
 | PR-0020 | 已完成 | ADR 定义 approval flow 语义 | `docs/tasks/T-0022-approval-flow-adr.md` | ApprovalRequest、approval_result Signal、approval Event/Checkpoint 边界；不实现 runtime | ADR review；`make check` |
+| PR-0021 | 已完成 | InMemory ApprovalRequest store | `docs/tasks/T-0023-inmemory-approval-request-store.md` | ApprovalRequest record、deterministic id、InMemory store；不实现 runner flow | approval store tests；`make check` |
 
 ## PR-0001 / PR-0001F / PR-0001G 完成记录
 
@@ -214,6 +215,14 @@
 - 决定 approval request / resolved 都必须追加 Event，并保存 Checkpoint 作为恢复边界。
 - 明确后续首个实现应保持 InMemory、FakeModel 和 deterministic tests。
 - 未实现 runtime 代码、ApprovalRequest store、真实 identity provider、production policy、Parent/Child Session 或 capability delegation。
+
+## PR-0021 完成记录
+
+- 新增 `ApprovalStatus`、`ApprovalRequest` 和 deterministic `approval_request_id`。
+- 新增 `InMemoryApprovalRequestStore`，覆盖 create idempotency、get/list lookup、pending ordering、resolve concurrency 和 terminal immutability。
+- 新增 public package exports。
+- 新增 deterministic approval model/store tests。
+- 未实现 Activation Runner approval-required 分支、`approval_result` Signal dispatch、approval Event 或 Checkpoint 保存。
 
 ## 队列纪律
 

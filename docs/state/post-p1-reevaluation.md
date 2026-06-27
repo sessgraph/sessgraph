@@ -66,4 +66,4 @@ P0 durable Session runtime core 已完成本地核心闭环。第二阶段 / P1 
 
 ## 当前推荐下一步
 
-Safety/Auth ADR、首个 InMemory capability policy gate 和 approval flow ADR 已完成；后续不要直接实现未排队能力，建议基于 ADR-0008 拆 ApprovalRequest store / approval result flow 的本地确定性实现切片。
+Safety/Auth ADR、首个 InMemory capability policy gate、approval flow ADR 和 InMemory ApprovalRequest store 已完成；后续不要直接实现未排队能力，建议基于 ADR-0008 拆 approval-required runner branch / approval result runtime flow 的本地确定性实现切片。

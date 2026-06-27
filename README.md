@@ -28,7 +28,7 @@ P0 只做本地、确定性、可测试的 runtime core：
 - 其他后续能力应重新立项后再进入实现。
 - 确定性测试和最小可运行 example。
 
-第二阶段 / P1 聚焦本地调度语义与开源可用性：license/package hygiene、async job/timer ADR、InMemory timer flow、InMemory async job flow、Memory + Context ADR、InMemory context builder、deterministic memory compaction example/test、Safety/Auth ADR、InMemory capability policy gate 和 approval flow ADR 已完成。ApprovalRequest store / approval result runtime flow、真实 provider、database、production queue、server、cloud、GUI 和 parent/child session 仍需后续单独立项。
+第二阶段 / P1 聚焦本地调度语义与开源可用性：license/package hygiene、async job/timer ADR、InMemory timer flow、InMemory async job flow、Memory + Context ADR、InMemory context builder、deterministic memory compaction example/test、Safety/Auth ADR、InMemory capability policy gate、approval flow ADR 和 InMemory ApprovalRequest store 已完成。approval-required runner branch / approval result runtime flow、真实 provider、database、production queue、server、cloud、GUI 和 parent/child session 仍需后续单独立项。
 
 P0 明确不做：真实 LLM provider、数据库、Web server、云部署、GUI、复杂多 Agent 编排、业务逻辑。
 

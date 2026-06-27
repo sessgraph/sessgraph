@@ -7,11 +7,15 @@ import unittest
 from sessgraph import (
     ActivationRunner,
     AgentDefinition,
+    ApprovalRequest,
+    ApprovalStatus,
     AuthContext,
     CapabilityGrant,
+    ConcurrencyError,
     DecisionKind,
     FakeModel,
     IdempotencyConflictError,
+    InMemoryApprovalRequestStore,
     InMemoryCapabilityGrantStore,
     InMemoryCheckpointStore,
     InMemoryEventStore,
@@ -26,6 +30,8 @@ from sessgraph import (
     SyncToolExecutor,
     ToolRegistry,
     ToolSpec,
+    ValidationError,
+    approval_request_id,
     capability_grant_id,
 )
 
@@ -84,6 +90,145 @@ class AuthModelTests(unittest.TestCase):
 
         with self.assertRaises(IdempotencyConflictError):
             store.save(_grant(grant_id="grant-2", idempotency_key="grant-request-1"))
+
+
+class ApprovalRequestModelTests(unittest.TestCase):
+    def test_approval_request_round_trips_and_has_deterministic_id(self) -> None:
+        approval_id = approval_request_id(
+            session_id="sess-1",
+            decision_id="dec-1",
+            action_kind="tool_call",
+            resource={"tool_name": "uppercase"},
+            idempotency_key="approval-request-1",
+        )
+        approval = _approval_request(
+            approval_id=approval_id,
+            idempotency_key="approval-request-1",
+        )
+
+        restored = ApprovalRequest.from_dict(approval.to_dict())
+
+        self.assertEqual(restored, approval)
+        self.assertFalse(restored.is_terminal)
+        self.assertTrue(approval_id.startswith("sess-1:approval:"))
+        with self.assertRaises(TypeError):
+            restored.resource["extra"] = "blocked"
+        with self.assertRaises(TypeError):
+            restored.action_payload["arguments"]["text"] = "changed"
+
+    def test_approval_request_requires_consistent_lifecycle_fields(self) -> None:
+        with self.assertRaises(ValidationError):
+            _approval_request(resolved_at=NOW)
+
+        with self.assertRaises(ValidationError):
+            _approval_request(status=ApprovalStatus.APPROVED)
+
+        with self.assertRaises(ValidationError):
+            _approval_request(
+                status=ApprovalStatus.APPROVED,
+                resolved_at=NOW - timedelta(seconds=1),
+                resolved_by=_actor("approver"),
+            )
+
+
+class InMemoryApprovalRequestStoreTests(unittest.TestCase):
+    def test_create_get_and_list_return_snapshots(self) -> None:
+        store = InMemoryApprovalRequestStore()
+        later = _approval_request(
+            approval_id="approval-2",
+            decision_id="dec-2",
+            created_at=NOW + timedelta(seconds=1),
+        )
+        earlier = _approval_request(approval_id="approval-1", decision_id="dec-1")
+
+        self.assertEqual(store.create(later), later)
+        self.assertEqual(store.create(earlier), earlier)
+
+        self.assertEqual(store.get("approval-1"), earlier)
+        self.assertEqual(store.list_for_session("sess-1"), (earlier, later))
+        self.assertEqual(store.list_pending_for_session("sess-1"), (earlier, later))
+        with self.assertRaises(TypeError):
+            store.get("approval-1").data["extra"] = "blocked"
+
+    def test_create_is_idempotent_and_rejects_conflicts(self) -> None:
+        store = InMemoryApprovalRequestStore()
+        approval = _approval_request(idempotency_key="approval-request-1")
+
+        self.assertEqual(store.create(approval), approval)
+        self.assertEqual(store.create(approval), approval)
+
+        with self.assertRaises(IdempotencyConflictError):
+            store.create(_approval_request(resource={"tool_name": "other"}))
+
+        with self.assertRaises(IdempotencyConflictError):
+            store.create(
+                _approval_request(
+                    approval_id="approval-2",
+                    idempotency_key="approval-request-1",
+                )
+            )
+
+        with self.assertRaises(ValidationError):
+            store.create(
+                _approval_request(
+                    status=ApprovalStatus.DENIED,
+                    resolved_at=NOW + timedelta(seconds=1),
+                    resolved_by=_actor("approver"),
+                )
+            )
+
+    def test_resolve_terminal_status_and_idempotency(self) -> None:
+        store = InMemoryApprovalRequestStore()
+        approval = _approval_request(idempotency_key="approval-request-1")
+        store.create(approval)
+
+        resolved = store.resolve(
+            "approval-1",
+            status=ApprovalStatus.APPROVED,
+            resolved_at=NOW + timedelta(seconds=5),
+            resolved_by=_actor("approver"),
+            reason="approved_by_user",
+            data={"ticket": "APP-1"},
+        )
+
+        self.assertEqual(resolved.status, ApprovalStatus.APPROVED)
+        self.assertTrue(resolved.is_terminal)
+        self.assertEqual(resolved.resolved_by["actor_id"], "approver")
+        self.assertEqual(resolved.data["ticket"], "APP-1")
+        self.assertEqual(store.list_pending_for_session("sess-1"), ())
+        self.assertEqual(
+            store.resolve(
+                "approval-1",
+                status=ApprovalStatus.APPROVED,
+                resolved_at=NOW + timedelta(seconds=5),
+                resolved_by=_actor("approver"),
+                reason="approved_by_user",
+                data={"ticket": "APP-1"},
+            ),
+            resolved,
+        )
+
+        with self.assertRaises(ConcurrencyError):
+            store.resolve(
+                "approval-1",
+                status=ApprovalStatus.DENIED,
+                resolved_at=NOW + timedelta(seconds=6),
+                resolved_by=_actor("approver"),
+                reason="changed_mind",
+            )
+
+    def test_resolve_rejects_pending_status(self) -> None:
+        store = InMemoryApprovalRequestStore()
+        store.create(_approval_request())
+
+        with self.assertRaises(ValidationError):
+            store.resolve(
+                "approval-1",
+                status=ApprovalStatus.PENDING,
+                resolved_at=NOW + timedelta(seconds=1),
+                resolved_by=_actor("approver"),
+                reason="not_terminal",
+            )
 
 
 class InMemoryPolicyGateTests(unittest.TestCase):
@@ -317,6 +462,52 @@ def _grant(
         created_at=NOW,
         idempotency_key=idempotency_key,
     )
+
+
+def _approval_request(
+    *,
+    approval_id: str = "approval-1",
+    decision_id: str = "dec-1",
+    signal_id: str = "sig-1",
+    action_kind: str = "tool_call",
+    resource: dict[str, object] | None = None,
+    status: ApprovalStatus = ApprovalStatus.PENDING,
+    created_at: datetime = NOW,
+    resolved_at: datetime | None = None,
+    resolved_by: dict[str, object] | None = None,
+    data: dict[str, object] | None = None,
+    idempotency_key: str | None = None,
+) -> ApprovalRequest:
+    return ApprovalRequest(
+        approval_id=approval_id,
+        session_id="sess-1",
+        decision_id=decision_id,
+        signal_id=signal_id,
+        action_kind=action_kind,
+        resource=resource or {"tool_name": "uppercase"},
+        action_payload={
+            "kind": "tool_call",
+            "tool_name": "uppercase",
+            "arguments": {"text": "hello"},
+        },
+        requesting_actor=_actor("user-1"),
+        status=status,
+        created_at=created_at,
+        resolved_at=resolved_at,
+        resolved_by=resolved_by,
+        reason="requires_user_approval",
+        data=data or {},
+        idempotency_key=idempotency_key,
+    )
+
+
+def _actor(actor_id: str) -> dict[str, object]:
+    return {
+        "actor_id": actor_id,
+        "actor_type": "user",
+        "subject": f"user:{actor_id}",
+        "authenticated": True,
+    }
 
 
 def _session(

@@ -14,11 +14,15 @@ from sessgraph.core import (
     ValidationError,
 )
 from sessgraph.auth import (
+    ApprovalRequest,
+    ApprovalStatus,
     AuthContext,
     CapabilityGrant,
+    InMemoryApprovalRequestStore,
     InMemoryCapabilityGrantStore,
     InMemoryPolicyGate,
     PolicyDecision,
+    approval_request_id,
     capability_grant_id,
 )
 from sessgraph.context import (
@@ -79,6 +83,8 @@ __all__ = [
     "ActivationResult",
     "ActivationRunner",
     "AgentDefinition",
+    "ApprovalRequest",
+    "ApprovalStatus",
     "AuthContext",
     "CapabilityGrant",
     "Checkpoint",
@@ -94,6 +100,7 @@ __all__ = [
     "Event",
     "FakeModel",
     "IdempotencyConflictError",
+    "InMemoryApprovalRequestStore",
     "InMemoryCheckpointStore",
     "InMemoryCapabilityGrantStore",
     "InMemoryEventStore",
@@ -128,6 +135,7 @@ __all__ = [
     "ToolResult",
     "ToolSpec",
     "ValidationError",
+    "approval_request_id",
     "capability_grant_id",
     "memory_id_for_record",
 ]
